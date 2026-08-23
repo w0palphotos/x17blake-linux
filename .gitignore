@@ -1,0 +1,7 @@
+Blake_EB__X17_Software_V1.0_19082000.exe
+FANTECH X17/
+__pycache__/
+*.egg-info/
+dist/
+build/
+*.pcap.orig

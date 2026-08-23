@@ -1,0 +1,2 @@
+# Fantech X17 Blake / Wings Tech 2ea8:2203 config interface
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2ea8", ATTRS{idProduct}=="2203", MODE="0660", TAG+="uaccess"

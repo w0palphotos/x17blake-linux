@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "x17blake"
+version = "0.1.0"
+description = "Linux configurator for the Fantech X17 Blake (Wings Tech 2ea8:2203) gaming mouse"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+
+[project.scripts]
+x17blake = "x17blake.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["x17blake*"]

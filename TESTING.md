@@ -3,6 +3,22 @@
 Everything here runs straight from the source tree. The driver is pure
 Python stdlib — there is nothing to compile.
 
+## Portability notes for other machines
+
+- **OS**: Linux only today. The transport opens `/dev/hidraw*` and reads
+  `/sys/class/hidraw` directly. Porting elsewhere means swapping
+  `x17blake/hidraw.py` for a hidapi backend; everything above it
+  (`protocol.py`, `device.py`, `state.py`, `cli.py`) is OS-neutral.
+- **WSL2**: stock kernels lack hidraw, but `usbipd-win` can attach the
+  mouse to WSL and it then appears as a normal hidraw device. Same udev
+  rule applies inside WSL if you run udev there.
+- **Python**: >= 3.9, no third-party packages.
+- **Permissions**: without the udev rule every device open fails with
+  EACCES — that is expected; install the rule or run under sudo for a
+  one-off test.
+
+Everything below assumes Linux with the mouse plugged in.
+
 ## 0. One-time prerequisite: udev rule
 
 HID raw devices are root-only by default. Install the shipped rule once

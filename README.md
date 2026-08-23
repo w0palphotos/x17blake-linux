@@ -2,62 +2,98 @@
 
 Linux configurator for the Fantech X17 Blake gaming mouse
 (Wings Tech `2ea8:2203`), reverse engineered from the Windows driver
-package. Pure Python stdlib; no dependencies.
+package. Pure Python stdlib; no dependencies; no daemon.
 
-Status: protocol probing phase. See [PROTOCOL.md](PROTOCOL.md).
+## Status: work in progress
 
-## Install (development)
+| Feature | State |
+|---|---|
+| Read settings / device info | ✅ tested |
+| **DPI stages & active stage** | ✅ **tested end-to-end** |
+| Lift-off distance | ⚠️ implemented, light testing |
+| Backup / restore / factory reset | ✅ proven during recovery |
+| Lighting (LED effects/colors) | ❌ not implemented — see note below |
+| Button remapping | ❌ future work |
+| Polling rate | ❌ future work |
+
+> **Note:** only DPI control has been verified by daily use so far.
+> Everything else is under active development. On this firmware the
+> lighting state does NOT live in the settings frame we can write —
+> naive LED writes corrupt the engine (details in
+> [PROTOCOL.md](PROTOCOL.md)) — so lighting stays unimplemented until
+> the vendor opcodes are decoded from a labeled capture.
+
+Should also work on anything sharing the `2ea8:2203` platform
+(e.g. Sharkoon Light² 200) — untested reports welcome.
+
+## Install
 
 ```sh
+git clone https://github.com/<you>/x17blake.git
+cd x17blake
+
+# one-time: allow your user to talk to the mouse
 sudo cp udev/70-x17blake.rules /usr/lib/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
-pip install .
+
+# run without installing anything:
+python3 -m x17blake show
 ```
+
+Optional editable install (`pip install -e .`) provides the
+`x17blake` command; see [TESTING.md](TESTING.md) for venv details and
+stale-copy diagnostics.
 
 ## Usage
 
 ```sh
 x17blake show                  # pretty status panel (--json for scripts)
-x17blake info                  # hidraw nodes
+x17blake info                  # list hidraw nodes
 
-# DPI
-x17blake dpi 1600              # set dpi of the ACTIVE stage
-x17blake stage 3 2000          # set stage 3
-
-# Lighting (effects: pulsating_rgb_cycle, pulsating, permanent, color_change,
-#  single_color_marquee, multi_color_marquee, ripple, trigger, heartbeat, off)
-x17blake led ripple --brightness 5 --speed 1
-x17blake led permanent --color FF0000
-x17blake color 00FF00          # solid-color shortcut (all slots)
-
-# Lighting: intentionally not implemented yet — on this firmware the
-# lighting state does NOT live in the settings frame; writing there
-# corrupts the LED engine (see PROTOCOL.md). Returns after the real
-# lighting opcodes are decoded.
-
+x17blake dpi 1600              # set dpi of the ACTIVE stage (200-10000)
+x17blake stage 3 2000          # set stage 1-7 individually
 x17blake lod 2                 # lift-off distance 1-3
 
-# Safety
-x17blake backup [label]        # snapshot device state to ~/.config/x17blake/
+x17blake backup [label]        # snapshot state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
 x17blake reset --yes           # factory reset (recovery path)
 ```
 
-See [TESTING.md](TESTING.md) for running without installing, stale-copy
-diagnostics, and the safety model.
+Every mutating command auto-backups first and writes only to
+verified-safe fields; unknown-field writes are refused at the protocol
+layer.
 
-Every mutating command auto-saves a backup first. Writes are restricted
-to verified field offsets — raw/unknown-field writes require explicit
-override and never happen through normal commands.
+## Developing on another machine
 
-No dependencies, no daemon, no root (with the shipped udev rule).
+Requirements: **Linux**, Python ≥ 3.9, any USB host controller.
+Windows/macOS are not supported yet (the transport uses Linux
+`hidraw`/sysfs directly).
+
+```sh
+sudo dnf install git python3          # Fedora
+git clone https://github.com/<you>/x17blake.git && cd x17blake
+python3 -m x17blake info              # verify device access
+```
+
+That's the whole build — there is nothing to compile. Code layout:
+
+| File | What lives there |
+|---|---|
+| `x17blake/hidraw.py` | OS transport (hidraw ioctls, frame exchange) |
+| `x17blake/protocol.py` | frame builders/parsers, DPI tables — port target |
+| `x17blake/device.py` | transaction layer + safety validation |
+| `x17blake/state.py` | backup/restore, mutation guardrails |
+| `x17blake/cli.py` | argparse CLI |
+
+For reverse-engineering new features start at
+[REVERSING.md](REVERSING.md); test workflow in
+[TESTING.md](TESTING.md). Protocol reference:
+[PROTOCOL.md](PROTOCOL.md).
 
 ## Roadmap
 
-- [x] Protocol dialect + transport fully decoded
-- [x] Setters with read-back verification + safety layer
-- [x] Factory reset / recovery path (proven live)
-- [ ] Button remapping (A7 channel layout)
+- [ ] Lighting via decoded vendor opcodes (blocked on capture)
+- [ ] Button remapping (`A7` channel layout)
 - [ ] Polling rate control
 - [ ] TUI frontend (on top of the CLI library layer)
 - [ ] RPM packaging, COPR

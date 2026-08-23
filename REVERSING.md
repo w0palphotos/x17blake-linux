@@ -14,12 +14,12 @@ and are intentionally NOT committed to this repository (see
 
 Key files inside:
 
-| File | Role |
-|---|---|
-| `OemDrv.exe` | MFC GUI; builds every protocol frame here |
-| `Lowerdev.dll` | thin `HidD_*` passthrough — nothing to learn |
-| `Cfg.ini` | sensor/DPI tables, default key codes, polling hints |
-| `text.xml` | UI strings (feature list, "Restore" button, etc.) |
+| File           | Role                                                |
+| -------------- | --------------------------------------------------- |
+| `OemDrv.exe`   | MFC GUI; builds every protocol frame here           |
+| `Lowerdev.dll` | thin `HidD_*` passthrough — nothing to learn        |
+| `Cfg.ini`      | sensor/DPI tables, default key codes, polling hints |
+| `text.xml`     | UI strings (feature list, "Restore" button, etc.)   |
 
 ## Regenerating disassembly
 
@@ -34,18 +34,18 @@ virtual addresses via section headers (`objdump -h`): for `.rdata`,
 
 ## Already-decoded landmarks in OemDrv.exe
 
-| Address | What it is |
-|---|---|
-| `0x401000` | HID transport: prepends report id `0x04`, overlapped 64-byte write |
-| `0x401150` | send wrapper: stage buffer -> transport -> Sleep(20 ms) per chunk |
-| `0x43ce10` | reply poller (~100 x 20 ms) validating `A0 ...` header |
-| `0x43cce0` | LoadLibrary/GetProcAddress resolver for Lowerdev.dll |
-| `0x43c5e0` | reader thread (interface 1 input reports) |
-| `0x43ce10–0x43d630` | message builders cluster (opener/GET/SET/commit/A7) |
-| `0x43d130` | GET settings; parses reply payload at offset +5 into caller struct |
-| `0x43cfe0` | SET settings (variant A `01 02 A5`, then commit B `02 02 A5`) |
-| `0x43d240` | key/binding upload channel (`A7 ...`) — layout still open |
-| globals `0x5d9020`, `0x5d8fe0` | receive buffers |
+| Address                        | What it is                                                         |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `0x401000`                     | HID transport: prepends report id `0x04`, overlapped 64-byte write |
+| `0x401150`                     | send wrapper: stage buffer -> transport -> Sleep(20 ms) per chunk  |
+| `0x43ce10`                     | reply poller (~100 x 20 ms) validating `A0 ...` header             |
+| `0x43cce0`                     | LoadLibrary/GetProcAddress resolver for Lowerdev.dll               |
+| `0x43c5e0`                     | reader thread (interface 1 input reports)                          |
+| `0x43ce10–0x43d630`            | message builders cluster (opener/GET/SET/commit/A7)                |
+| `0x43d130`                     | GET settings; parses reply payload at offset +5 into caller struct |
+| `0x43cfe0`                     | SET settings (variant A `01 02 A5`, then commit B `02 02 A5`)      |
+| `0x43d240`                     | key/binding upload channel (`A7 ...`) — layout still open          |
+| globals `0x5d9020`, `0x5d8fe0` | receive buffers                                                    |
 
 Frame grammar and byte layouts: see PROTOCOL.md.
 
@@ -70,4 +70,5 @@ Frame grammar and byte layouts: see PROTOCOL.md.
 
 If you ever need deeper static work, Ghidra (headless) gives function
 boundaries that raw objdump lacks; everything above was done with objdump
-+ grep alone.
+
+- grep alone.

@@ -170,6 +170,18 @@ factory-reset frame + power cycle. Lesson encoded in tooling: writes are
 restricted to verified field offsets; unknown-field writes require
 explicit override; auto-backup before every mutation.
 
+## LED findings (2026-08-23, post-incident)
+
+Writing bytes 37-41 / 42-62 through the settings frame is HARMFUL on
+Blake firmware: the lighting engine accepts renders briefly, then dies
+(at replug at latest), and the block reverts writes. Factory reset
+frame revives it, but repeated wedges suggest NVM-level corruption.
+The real lighting control must use a different opcode family
+(candidates: `AA`, `A7` variants) — decode from a labeled Windows
+OemDrv capture before any further LED experiments. The CLI therefore
+blocks these fields (`state.MUTABLE_OFFSETS`) and ships no led/color
+commands.
+
 ## Open questions
 
 1. Meaning of byte 8 (enabled mask = 0x01 while 7 stages configured?).

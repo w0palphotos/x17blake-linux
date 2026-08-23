@@ -159,45 +159,6 @@ def _resolve_effect(text):
     return eid
 
 
-def cmd_led(args):
-    effect_id = None
-    if args.effect is not None:
-        effect_id = _resolve_effect(args.effect)
-    rgb = _parse_color(args.color) if args.color else None
-
-    def mut(f):
-        if effect_id is not None:
-            f[37] = effect_id
-        if args.brightness is not None:
-            f[39] = max(0, min(10, args.brightness))
-        if args.speed is not None:
-            f[38] = max(0, min(2, args.speed))
-        if rgb is not None:
-            for i in range(1, 8):
-                protocol.set_stage_color(f, i, rgb)
-
-    what = "led"
-    if effect_id is not None:
-        what += f" effect={effect_id}"
-    if rgb is not None:
-        what += f" color=%02X%02X%02X" % tuple(rgb)
-    with Device() as dev:
-        state = _mutate_and_apply(dev, mut, what)
-    _show_pretty(state)
-    return 0
-
-
-def cmd_color(args):
-    rgb = _parse_color(args.color)
-
-    def mut(f):
-        for i in range(1, 8):
-            protocol.set_stage_color(f, i, rgb)
-
-    with Device() as dev:
-        state = _mutate_and_apply(dev, mut, "color all slots")
-    _show_pretty(state)
-    return 0
 
 
 def cmd_lod(args):
@@ -212,17 +173,6 @@ def cmd_lod(args):
         print(f"verified: lift-off = {raw - 1 if raw >= 2 else raw}")
         return 0 if ok else 3
 
-
-def cmd_profile(args):
-    with Device() as dev:
-
-        def mut(f):
-            protocol.set_profile(f, args.index)
-
-        state = _mutate_and_apply(dev, mut, f"profile -> {args.index}")
-        ok = state[40] == args.index
-        print(f"verified: profile = {state[40]}")
-        return 0 if ok else 3
 
 
 def cmd_backup(args):
@@ -318,24 +268,9 @@ def main(argv=None):
     p.add_argument("dpi", type=int, metavar="DPI")
     p.set_defaults(func=cmd_stage)
 
-    p = sub.add_parser("led", help="lighting control")
-    p.add_argument("effect", nargs="?", metavar="EFFECT")
-    p.add_argument("--color", metavar="RRGGBB", help="paint all 7 color slots")
-    p.add_argument("--brightness", type=int, choices=range(0, 11), metavar="0-10")
-    p.add_argument("--speed", type=int, choices=range(0, 3), metavar="0-2")
-    p.set_defaults(func=cmd_led)
-
-    p = sub.add_parser("color", help="solid color shortcut (all slots)")
-    p.add_argument("color", metavar="RRGGBB")
-    p.set_defaults(func=cmd_color)
-
     p = sub.add_parser("lod", help="lift-off distance")
     p.add_argument("level", type=int, choices=(1, 2, 3), metavar="1-3")
     p.set_defaults(func=cmd_lod)
-
-    p = sub.add_parser("profile", help="switch settings profile slot")
-    p.add_argument("index", type=int, choices=range(1, 6), metavar="1-5")
-    p.set_defaults(func=cmd_profile)
 
     p = sub.add_parser("backup", help="snapshot current device state")
     p.add_argument("label", nargs="?", default="manual")

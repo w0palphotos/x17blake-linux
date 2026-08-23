@@ -50,11 +50,13 @@ def diff_bytes(before, after):
     return [i for i in range(min(len(before), len(after))) if before[i] != after[i]]
 
 
-MUTABLE_OFFSETS = frozenset(
-    [7, *range(9, 30), 33, *range(37, 40), 40, *range(42, 63)]
-)
-
 HEADER_OFFSETS = frozenset(range(0, 4))
+MUTABLE_OFFSETS = frozenset([7, *range(9, 30), 33])
+FORBIDDEN_NOTE = (
+    "LED/profile fields (37-41, 42-62) are write-blocked: on this firmware "
+    "they are NOT the lighting store; writing them corrupts the LED engine "
+    "until factory reset. True lighting opcodes not yet decoded."
+)
 
 
 def validate_mutations(before, after):

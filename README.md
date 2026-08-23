@@ -30,14 +30,21 @@ x17blake led ripple --brightness 5 --speed 1
 x17blake led permanent --color FF0000
 x17blake color 00FF00          # solid-color shortcut (all slots)
 
+# Lighting: intentionally not implemented yet — on this firmware the
+# lighting state does NOT live in the settings frame; writing there
+# corrupts the LED engine (see PROTOCOL.md). Returns after the real
+# lighting opcodes are decoded.
+
 x17blake lod 2                 # lift-off distance 1-3
-x17blake profile 2             # profile slot 1-5
 
 # Safety
 x17blake backup [label]        # snapshot device state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
-x17blake reset --yes           # factory reset (fixes bindings/LED state)
+x17blake reset --yes           # factory reset (recovery path)
 ```
+
+See [TESTING.md](TESTING.md) for running without installing, stale-copy
+diagnostics, and the safety model.
 
 Every mutating command auto-saves a backup first. Writes are restricted
 to verified field offsets — raw/unknown-field writes require explicit

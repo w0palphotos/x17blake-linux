@@ -72,3 +72,6 @@ If you ever need deeper static work, Ghidra (headless) gives function
 boundaries that raw objdump lacks; everything above was done with objdump
 
 - grep alone.
+
+For the hands-on USB capture workflow (VM setup, segment checklist,
+decode loop), see [docs/CAPTURE-GUIDE.md](docs/CAPTURE-GUIDE.md).

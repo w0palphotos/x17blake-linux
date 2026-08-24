@@ -1,7 +1,7 @@
-# Button remapping — verified live from Linux
+# Button remapping: verified live from Linux
 
 Feature: `x17blake keys bind|clear|show`. Everything below was proven on
-hardware `2ea8:2203` on 2026-08-24 **without any Windows VM capture** —
+hardware `2ea8:2203` on 2026-08-24 **without any Windows VM capture**:
 the wire format came from earlier OemDrv pcaps, and every semantic
 (slot ownership, function meanings) was established by writing
 candidate records from Linux and observing the effect.
@@ -13,12 +13,12 @@ candidate records from Linux and observing the effect.
   residents `b5@32 / b6@37 / c8@52` are factory wheel-up / wheel-down /
   LED-cycle assignments, not protocol magic.
 * Record formats:
-  * `fc 00 <HID>` — plain keyboard key (`fc 00 14` = Q)
-  * `fc 01 <HID>` — Ctrl-modified key (`fc 01 13` = Ctrl+P)
-  * `<T> 00 00 00 00` — built-in function (see table)
+  * `fc 00 <HID>`, plain keyboard key (`fc 00 14` = Q)
+  * `fc 01 <HID>`: Ctrl-modified key (`fc 01 13` = Ctrl+P)
+  * `<T> 00 00 00 00`, built-in function (see table)
 * Slot ownership: 27=forward, 22=back, 42=dpi-, 47=dpi+; slot 57
   accepts records but its button is unidentified.
-* GET replies never contain bindings — host-side state is the only
+* GET replies never contain bindings, host-side state is the only
   source of truth; a commit write redefines the whole table.
 * Special-function records emit no button-press notify on EP2 IN;
   keyboard-class bindings echo as `[01][class][00][code]`.
@@ -39,7 +39,7 @@ candidate records from Linux and observing the effect.
 | 0xC8 | lighting-mode cycle | forward-slot relocation |
 
 Tags 0x97-0x9A emit keyboard-like output (`98`=Mod+R, `99`=Mod+F,
-`9A`='d') — separate shortcut space, uncatalogued.
+`9A`='d'): separate shortcut space, uncatalogued.
 
 ## Commands used and results
 
@@ -71,5 +71,5 @@ Safety behavior verified:
 ## Known limitations
 
 * Mouse-button targets (bind to right-click etc.) have no known wire
-  encoding yet — Cfg.ini codes are UI-namespace only.
+  encoding yet, Cfg.ini codes are UI-namespace only.
 * Disable tag, macro step encoding, polling-rate opcode: open.

@@ -1,4 +1,4 @@
-# USB capture guide — recording and mapping MCU frames
+# USB capture guide: recording and mapping MCU frames
 
 How to systematically record what the vendor Windows tool sends to the
 mouse, so new features can be decoded without guesswork. This workflow
@@ -7,16 +7,16 @@ produced every opcode in [PROTOCOL.md](../PROTOCOL.md).
 ## One-time / per-session setup
 
 ```sh
-lsusb | grep -i 2ea8        # NOTE THE BUS NUMBER — it moves between ports!
+lsusb | grep -i 2ea8        # NOTE THE BUS NUMBER, it moves between ports!
 sudo modprobe usbmon        # no-op if already loaded
 sudo tcpdump -i usbmon<N> -s0 -w captures/<segment>.pcap
 ```
 
 * `<N>` = the bus from `lsusb` (e.g. Bus 003 -> `usbmon3`). **The mouse
-  changes buses whenever it is replugged into a different port** — this
+  changes buses whenever it is replugged into a different port, this
   has silently wasted a capture before; always re-check.
 * Sanity check within ~10 s of starting: touch the mouse / click once,
-  then `ls -la captures/<segment>.pcap` — the file must be growing.
+  then `ls -la captures/<segment>.pcap`, the file must be growing.
 * To hand the mouse to the Windows VM: virt-viewer menu ->
   *Redirect USB device*. Take it back the same way when testing from
   Linux (`x17blake` cannot see a redirected device).
@@ -29,15 +29,15 @@ sudo tcpdump -i usbmon<N> -s0 -w captures/<segment>.pcap
    from an identical state.
 3. Name captures after the single action recorded:
    `captures/button-fwd-keyb.pcap`, not `captures/session4.pcap`.
-4. Never trust one surprising result — repeat the segment twice.
+4. Never trust one surprising result, repeat the segment twice.
 5. Start tcpdump BEFORE launching/using OemDrv for that action, stop
-   right after (Ctrl-C) — keeps files small and segments clean.
+   right after (Ctrl-C): keeps files small and segments clean.
 
 ## Segment checklist
 
 Confirmed against the actual OemDrv UI (Key assignment / DPI / LED /
 Parameter / Macros pages). **Update 2026-08-24:** segments 5-7 are
-OBSOLETE — button semantics were decoded entirely from Linux via the
+OBSOLETE, button semantics were decoded entirely from Linux via the
 relocate-and-press technique (see REVERSING.md and
 `tools/explore_bindings.py`); no VM capture needed. Remaining valuable
 segments marked with ❗.
@@ -48,14 +48,14 @@ segments marked with ❗.
 | 2 | `param-sensitivity` ❗ | sensitivity slider: 1 -> Apply, then 20 -> Apply | sensitivity byte (1-20) | open |
 | 3 | `param-scroll` ❗ | scroll-speed slider: 1 -> Apply, then 10 -> Apply | scroll-speed byte (1-10) | open |
 | 4 | `param-dblclick` ❗ | double-click slider: 830 -> Apply, then 200 -> Apply | debounce field (16-bit ms?) | open |
-| ~~5~~ | ~~key-fwd-keyb~~ | — | — | decoded from Linux |
-| ~~6~~ | ~~key-back-media~~ | — | — | decoded from Linux (function tags) |
+| ~~5~~ | ~~key-fwd-keyb~~ |, |, | decoded from Linux |
+| ~~6~~ | ~~key-back-media~~ |, |, | decoded from Linux (function tags) |
 | ~~7~~ | ~~key-disable~~ | any button -> Disable | disable encoding | still unknown; a 30 s capture would settle it |
 | 8 | `macro-record-shortcut` ❗ | record keyboard shortcut, save | macro blob format (`AA`->`A7`->`A8` trio) | structure known, steps open |
 | 9 | `macro-assign` ❗ | assign macro to thumb button | assignment linkage | open |
 
 Settings that produce ZERO new frames during capture are Windows-side
-only — document and skip them (Linux has native pointer/scroll
+only, document and skip them (Linux has native pointer/scroll
 acceleration).
 
 Already-decoded segments (do not redo): startup burst, DPI writes,
@@ -74,7 +74,7 @@ Then correlate:
 1. List OUT frames chronologically; match their count/order to your
    clicks.
 2. Frames matching known families (`A0 01 xx` settings, `A1 02` init,
-   `A4 03` params, commit) are already understood — tag and skip.
+   `A4 03` params, commit) are already understood, tag and skip.
 3. Anything NEW is the payload you came for. Diff it against the same
    frame from the previous segment: changed bytes = encoded value.
 4. Two captures whose inputs differ in exactly one option isolate a
@@ -100,7 +100,7 @@ Known unknowns at time of writing:
 * Stale pip-installed copy shadowing the working tree -> test via
   `python3 -m x17blake` from the repo, or reinstall editable.
 * Direction/endpoint fields in classic-pcap usbmon headers live at
-  byte offsets 9/10, NOT packed bits at offset 8 — use
+  byte offsets 9/10, NOT packed bits at offset 8, use
   `tools/pcap_frames.py`, which handles both formats correctly now.
 * The engine only re-renders after a fresh INIT + parameter bank;
   bare SETs update storage but can leave visuals stale.

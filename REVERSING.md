@@ -17,7 +17,7 @@ Key files inside:
 | File           | Role                                                |
 | -------------- | --------------------------------------------------- |
 | `OemDrv.exe`   | MFC GUI; builds every protocol frame here           |
-| `Lowerdev.dll` | thin `HidD_*` passthrough — nothing to learn        |
+| `Lowerdev.dll` | thin `HidD_*` passthrough, nothing to learn        |
 | `Cfg.ini`      | sensor/DPI tables, default key codes, polling hints |
 | `text.xml`     | UI strings (feature list, "Restore" button, etc.)   |
 
@@ -44,14 +44,14 @@ virtual addresses via section headers (`objdump -h`): for `.rdata`,
 | `0x43ce10–0x43d630`            | message builders cluster (opener/GET/SET/commit/A7)                |
 | `0x43d130`                     | GET settings; parses reply payload at offset +5 into caller struct |
 | `0x43cfe0`                     | SET settings (variant A `01 02 A5`, then commit B `02 02 a5`)      |
-| `0x43d240`                     | macro/key-list upload channel (`A7 ...`) — step encoding still open; simple button remaps ride the COMMIT frame instead |
+| `0x43d240`                     | macro/key-list upload channel (`A7 ...`): step encoding still open; simple button remaps ride the COMMIT frame instead |
 | globals `0x5d9020`, `0x5d8fe0` | receive buffers                                                    |
 
 Frame grammar and byte layouts: see PROTOCOL.md.
 
 ## Methodology that worked
 
-1. **Reuse public work first** — this platform is shared with the Sharkoon
+1. **Reuse public work first**: this platform is shared with the Sharkoon
    Light2 200 (same VID:PID `2ea8:2203`).
    https://github.com/axel-dd/sharkoon-light2-200 ships labeled pcaps;
    `tools/pcap_frames.py` extracts frames from them:
@@ -59,7 +59,7 @@ Frame grammar and byte layouts: see PROTOCOL.md.
    python3 tools/pcap_frames.py "captures/reset settings.pcapng"
    ```
    The factory-reset frame came from their `reset settings.pcapng`.
-2. **Live probing beats guessing** — GET/SET round-trips with read-back
+2. **Live probing beats guessing**: GET/SET round-trips with read-back
    verification (see `x17blake probe --roundtrip`).
 3. **One variable per experiment**, always with `x17blake backup` first.
 4. Guides worth reading:
@@ -71,7 +71,7 @@ Frame grammar and byte layouts: see PROTOCOL.md.
 ## Decoding without the VM (2026-08-24)
 
 Once the commit-frame binding table was understood from pcaps, the rest
-of the button semantics were decoded entirely from Linux — no Windows
+of the button semantics were decoded entirely from Linux, no Windows
 captures needed. The technique, now automated in
 `tools/explore_bindings.py`:
 
@@ -82,7 +82,7 @@ captures needed. The technique, now automated in
    boot-mouse reports on interface 0 (click bits / wheel), and a GET
    settings delta afterwards (active stage / profile changes).
 3. For functions with no observable side channel (volume, mute,
-   media), ask the operator what they perceived — one press per
+   media), ask the operator what they perceived, one press per
    candidate, five candidates per round.
 4. **Bisect safely first**: `--single` writes one record and checks the
    device survives it (some functions re-enumerate the USB device when

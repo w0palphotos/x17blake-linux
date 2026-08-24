@@ -1,34 +1,92 @@
 # x17blake
 
-Linux configurator for the Fantech X17 Blake gaming mouse
-(Wings Tech `2ea8:2203`), reverse engineered from the Windows driver
-package. Pure Python stdlib; no dependencies; no daemon.
+x17blake is a Linux configuration tool for the Fantech X17 Blake gaming mouse
+(Wings Tech `2ea8:2203`). It talks to the vendor HID config interface directly
+over hidraw and handles DPI stages, lift-off distance, lighting, button
+remapping, presets and backups. The protocol was reverse engineered from the
+Windows driver package. Pure Python stdlib, no daemon, nothing to compile.
 
-## Status: work in progress
+<a href="PROTOCOL.md">Protocol notes</a> -
+<a href="REVERSING.md">How it was reverse engineered</a> -
+<a href="docs/CAPTURE-GUIDE.md">USB capture guide</a> -
+<a href="TESTING.md">Testing without installing</a> -
+<a href="docs/verify/README.md">Verification log</a>
 
-| Feature                          | State                               |
-| -------------------------------- | ----------------------------------- |
-| Read settings / device info      | ✅ [tested](docs/verify/settings-readout.md) |
-| **DPI stages & active stage**    | ✅ **[tested end-to-end](docs/verify/dpi.md)** |
-| Lift-off distance                | ✅ [verified](docs/verify/lift-off-distance.md) |
-| Backup / restore / factory reset | ✅ [proven in recovery](docs/verify/backup-restore-reset.md) |
-| **Lighting: chroma/neon/breathe/steady/off, brightness, colors** | ✅ **[tested end-to-end](docs/verify/lighting-core.md)** |
-| Lighting: custom breathe / tail  | ✅ [tested](docs/verify/lighting-custom-breathe-tail.md) |
-| Effective color resolution       | 📊 [characterized](docs/verify/color-depth.md) |
-| **Button remapping (keyboard + built-in functions)** | ✅ **[tested end-to-end](docs/verify/keys-remapping.md)** |
-| Button remapping: mouse-button targets | ❌ wire encoding still unknown  |
-| Polling rate                     | ❌ future work                       |
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](#install)
 
-Per-feature test evidence lives in
-[docs/verify/README.md](docs/verify/README.md) — protocol facts,
-commands used, and observed results for everything marked ✅.
+x17blake supports:
 
-> **Note:** lighting, DPI, button remapping and recovery tooling are
-> verified in daily use. Protocol reference:
-> [PROTOCOL.md](PROTOCOL.md).
+- reading and writing all seven DPI stages (200 to 10000) and lift-off distance
+- every lighting mode the firmware has: chroma, neon, custom breathe, breathe,
+  tail, steady color and off, plus brightness and the seven-slot palette
+- remapping buttons to keyboard keys, Ctrl combos or built-in functions
+  (volume, media transport, scroll, LED mode cycle)
+- named presets that capture device state and bindings together
+- automatic backups before every write, and a factory reset recovery path
 
-Should also work on anything sharing the `2ea8:2203` platform
-(e.g. Sharkoon Light² 200) — untested reports welcome.
+Devices sharing the same platform, such as the Sharkoon Light² 200, should
+work too. Reports from other hardware are welcome.
+
+## Installation
+
+There are no packages yet, so run it from source:
+
+```sh
+git clone https://github.com/w0palphotos/x17blake-linux.git
+cd x17blake-linux
+
+# one time: allow your user to talk to the mouse
+sudo cp udev/70-x17blake.rules /usr/lib/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# run without installing anything
+python3 -m x17blake show
+```
+
+An editable install (`pip install -e .`) gives you the `x17blake` command.
+If that command ever behaves like an older version, [TESTING.md](TESTING.md)
+has the stale-copy diagnosis.
+
+## Usage
+
+```sh
+x17blake show                  # status panel (--json for scripts)
+x17blake info                  # list hidraw nodes
+
+x17blake dpi 1600              # dpi of the ACTIVE stage (200-10000)
+x17blake stage 3 2000          # set stage 1-7 individually
+x17blake lod 2                 # lift-off distance 1-3
+
+# lighting: chroma, neon, custom_breathe, breathe, tail, steady, off
+x17blake led steady --color FF0000 --brightness 4
+x17blake led chroma
+x17blake led off
+
+# buttons: keyboard keys or built-in functions
+x17blake keys                              # show current bindings
+x17blake keys bind forward --key b         # Forward types 'b'
+x17blake keys bind back --special mute     # volume_up/down, mute,
+x17blake keys bind dpi_plus --special next_track  # play_pause, prev/next,
+x17blake keys clear --all                  # scroll_up/down, led_cycle
+
+x17blake backup [label]        # snapshot state to ~/.config/x17blake/
+x17blake restore latest.json   # dry-run diff; add --yes to apply
+x17blake reset --yes           # factory reset (recovery path)
+
+# presets capture device state and bindings together
+x17blake preset list                       # bundled + your saved ones
+x17blake preset apply initial-factory      # dry-run diff; add --yes
+x17blake preset save my-setup -d "my daily driver"
+```
+
+One color tip: the LED channels are effectively ON/OFF on this firmware,
+so use `--brightness 0-4` for darker shades instead of dark hex values.
+
+Every command that writes something saves a backup first and refuses
+fields that have not been proven safe on real hardware. Run
+`x17blake help <command>` for the full option list of anything.
 
 ## Device specifications
 
@@ -39,7 +97,7 @@ sensor id `0x3325`):
 | Spec              | Value                                        |
 | ----------------- | -------------------------------------------- |
 | Sensor            | PixArt PMW3325 optical                       |
-| DPI               | 200 – 10,000, on-the-fly adjustable          |
+| DPI               | 200-10,000, on-the-fly adjustable            |
 | Polling rate      | 1000 Hz                                      |
 | Tracking          | 100 IPS / 20 G acceleration                  |
 | Switches          | Huano, 20 million click lifetime             |
@@ -49,111 +107,38 @@ sensor id `0x3325`):
 | Dimensions        | 125 × 62 × 42 mm                             |
 | Weight            | ~91 g without cable (~96 g with cable)       |
 
-> Some marketplace listings (incl. Shopee Indonesia) advertise
-> "PixArt 3360", "12,000 DPI", "250 IPS / 50 G" and "Omron switches".
-> Most retailers and the driver's own config disagree — e.g. the
-> vendor DPI table exposed by this driver tops out at 10,000.
-> The 7 lighting modes match what we decoded exactly.
+Some marketplace listings advertise a PixArt 3360 sensor, 12,000 DPI,
+250 IPS / 50 G tracking and Omron switches. Most retailers and the
+driver's own config disagree, and the vendor DPI table exposed by this
+driver tops out at 10,000. The seven lighting modes match what we
+decoded exactly.
 
-## Install
+## Requirements and code layout
 
-```sh
-git clone https://github.com/w0palphotos/x17blake-linux.git
-cd x17blake-linux
-
-# one-time: allow your user to talk to the mouse
-sudo cp udev/70-x17blake.rules /usr/lib/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-
-# run without installing anything:
-python3 -m x17blake show
-```
-
-Optional editable install (`pip install -e .`) provides the
-`x17blake` command; see [TESTING.md](TESTING.md) for venv details and
-stale-copy diagnostics.
-
-## Usage
-
-```sh
-x17blake show                  # pretty status panel (--json for scripts)
-x17blake info                  # list hidraw nodes
-
-x17blake dpi 1600              # set dpi of the ACTIVE stage (200-10000)
-x17blake stage 3 2000          # set stage 1-7 individually
-x17blake lod 2                 # lift-off distance 1-3
-
-# Lighting — modes: chroma, neon, custom_breathe, breathe, tail,
-# steady, off — plus brightness 0-4 and colors
-x17blake led steady --color FF0000 --brightness 4
-x17blake led chroma
-x17blake led tail
-x17blake led off
-
-# Color tip: channels are effectively ON/OFF on this firmware —
-# use --brightness 0-4 for darker shades, not dark hex values.
-
-# Button remapping — keyboard keys and built-in functions
-x17blake keys                              # show tracked bindings
-x17blake keys bind forward --key x         # Forward thumb button types 'x'
-x17blake keys bind back --special mute     # built-in functions:
-x17blake keys bind dpi_plus --special volume_up   #   volume_up/down, mute,
-x17blake keys bind dpi_minus --special scroll_down  # play_pause, prev/next,
-x17blake keys bind forward --hid 0x14      #   stop, led_cycle, ...
-x17blake keys clear --all                  # back to factory behavior
-
-x17blake help                              # full command overview
-x17blake help keys                         # detailed help for one command
-
-x17blake backup [label]        # snapshot state to ~/.config/x17blake/
-x17blake restore latest.json   # dry-run diff; add --yes to apply
-x17blake reset --yes           # factory reset (recovery path)
-
-# Presets — named full-state snapshots
-x17blake preset list                       # bundled + your saved ones
-x17blake preset apply initial-factory      # dry-run diff; add --yes to apply
-x17blake preset save my-setup -d "my daily driver"
-```
-
-Every mutating command auto-backups first and writes only to
-verified-safe fields; unknown-field writes are refused at the protocol
-layer.
-
-## Developing on another machine
-
-Requirements: **Linux**, Python ≥ 3.9, any USB host controller.
-Windows/macOS are not supported yet (the transport uses Linux
-`hidraw`/sysfs directly).
-
-```sh
-sudo dnf install git python3          # Fedora
-git clone https://github.com/w0palphotos/x17blake-linux && cd x17blake-linux
-python3 -m x17blake info              # verify device access
-```
-
-That's the whole build — there is nothing to compile. Code layout:
+Linux only today (the transport opens `/dev/hidraw*` directly), Python
+3.9+, any USB host controller.
 
 | File                   | What lives there                                 |
 | ---------------------- | ------------------------------------------------ |
 | `x17blake/hidraw.py`   | OS transport (hidraw ioctls, frame exchange)     |
-| `x17blake/protocol.py` | frame builders/parsers, DPI tables — port target |
+| `x17blake/protocol.py` | frame builders/parsers, binding codec, DPI tables |
 | `x17blake/device.py`   | transaction layer + safety validation            |
 | `x17blake/state.py`    | backup/restore, mutation guardrails              |
 | `x17blake/cli.py`      | argparse CLI                                     |
-
-For reverse-engineering new features start at
-[REVERSING.md](REVERSING.md); test workflow in
-[TESTING.md](TESTING.md). Protocol reference:
-[PROTOCOL.md](PROTOCOL.md).
+| `tools/explore_bindings.py` | relocate-and-press protocol decoder         |
+| `tools/probe_slots.py` | one-shot slot to button mapper                   |
 
 ## Roadmap
 
-- [x] Lighting: chroma / neon / breathe / steady / off + brightness + colors
-- [x] Lighting: custom breathe / tail
-- [x] Button remapping: keyboard keys, Ctrl-combos and built-in functions
-      (volume/media/scroll/LED-cycle) — decoded entirely from Linux
 - [ ] Button remapping: mouse-button targets (wire encoding unknown)
 - [ ] Polling rate control
 - [ ] Macro support (`AA`/`A7`/`A8` upload trio structurally known)
 - [ ] TUI frontend (on top of the CLI library layer)
 - [ ] RPM packaging, COPR
+
+Done already: lighting (all modes), DPI/lift-off, keyboard-key and
+built-in-function button remapping, presets, backup/restore/reset.
+Evidence for each lives in the [verification log](docs/verify/README.md).
+
+For research work start at [REVERSING.md](REVERSING.md); the wire-level
+reference is [PROTOCOL.md](PROTOCOL.md).

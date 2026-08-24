@@ -1,4 +1,4 @@
-# X17 Blake / Wings Tech 2ea8:2203 — Protocol Notes
+# X17 Blake / Wings Tech 2ea8:2203 protocol notes
 
 Working notes for reverse engineering the Fantech X17 Blake gaming mouse
 config channel on Linux.
@@ -170,9 +170,9 @@ factory-reset frame + power cycle. Lesson encoded in tooling: writes are
 restricted to verified field offsets; unknown-field writes require
 explicit override; auto-backup before every mutation.
 
-## Lighting — SOLVED (2026-08-24, verified live)
+## Lighting: SOLVED (2026-08-24, verified live)
 
-Blake effect ids (settings-frame byte 37) — **completely different from
+Blake effect ids (settings-frame byte 37): **completely different from
 the Sharkoon table**:
 
 | Id | Mode | Renders from Linux |
@@ -187,7 +187,7 @@ the Sharkoon table**:
 
 Other fields: byte 38 speed, byte 39 brightness (**0-4**, 0 = off),
 byte 40 enable (=1), **byte 41 = color-slot enable bitmask (0x7f = all
-seven)** — required for custom breathe / tail to render — bytes 42-62 =
+seven), required for custom breathe / tail to render, bytes 42-62 =
 7x RGB palette.
 
 Commit frame (`02 02 a5` variant) is NOT all-zero: the vendor sends
@@ -195,13 +195,13 @@ Commit frame (`02 02 a5` variant) is NOT all-zero: the vendor sends
 "junk echo" frames are echoes of these). `protocol.build_commit()`
 replicates it byte-exact.
 
-## Key bindings — DECODED (2026-08-24, from OemDrv captures)
+## Key bindings: DECODED (2026-08-24, from OemDrv captures)
 
 The **commit frame doubles as the button-remap carrier**. Its payload
 region reuses offsets 22-63 as a table of 5-byte slots (bases 22, 27,
 32, 37, 42, 47, 52). The historical "magic" bytes `b5@32 / b6@37 /
 c8@52` are simply permanent slot residents present even in factory
-commits — not protocol junk.
+commits, not protocol junk.
 
 Record layout per occupied slot:
 
@@ -218,12 +218,12 @@ settings frames never carry bindings.
 
 **Live Linux write verification (2026-08-24):**
 
-* `fc 00 1b` on slot 27 (forward) — button typed `x`. ✅
-* `fc 01 13` on slot 22 (back) — fired **Ctrl+P** (browser print
+* `fc 00 1b` on slot 27 (forward): button typed `x`. ✅
+* `fc 01 13` on slot 22 (back): fired **Ctrl+P** (browser print
   dialog), NOT right-click. This proves class 0x01 is a modified
   keyboard key and that Cfg.ini's `01 13 R` notation is the Windows UI
   namespace only. The wire encoding for mouse-button targets (bind a
-  physical button to left/right/middle/scroll/fire) remains UNKNOWN —
+  physical button to left/right/middle/scroll/fire) remains UNKNOWN;
   one targeted OemDrv capture still needed for that.
 * Both bindings cleared via commit-with-empty-table; buttons returned
   to factory behavior instantly (no power cycle needed).
@@ -241,11 +241,11 @@ Slot -> button map (ownership verified live 2026-08-24):
 | 52 | c8 resident | ditto |
 | 57 | ? | accepts records; owning button unidentified |
 
-### Bare-tag function records — DECODED LIVE (2026-08-24)
+### Bare-tag function records: DECODED LIVE (2026-08-24)
 
 Single-byte records `[T][00][00][00][00]` assign built-in functions.
 Decoded by relocating candidate tags into verified slots and observing
-the effect on Linux — no Windows captures involved:
+the effect on Linux, no Windows captures involved:
 
 | Tag | Function |
 |-----|----------|
@@ -263,27 +263,27 @@ the effect on Linux — no Windows captures involved:
 The residents at 32/37/52 are therefore factory wheel-up / wheel-down /
 LED-cycle assignments stored in the same table. Special-function
 bindings do NOT emit button-press notifies. Tags 0x97-0x9A emit
-keyboard-like output (`98`=Mod+R, `99`=Mod+F, `9A`='d') — a separate
+keyboard-like output (`98`=Mod+R, `99`=Mod+F, `9A`='d'): a separate
 shortcut space, mapping uncatalogued.
 
 **Live Linux write verification (2026-08-24):**
 
-* `fc 00 1b` @27 — Forward typed `x`.
-* `fc 01 13` @22 — fired **Ctrl+P** (print dialog), NOT right-click:
+* `fc 00 1b` @27, Forward typed `x`.
+* `fc 01 13` @22, fired **Ctrl+P** (print dialog), NOT right-click:
   class 0x01 is a modified keyboard key; Cfg.ini's `01 13 R` notation
   is the Windows UI namespace only. Mouse-button wire targets remain
   UNKNOWN.
-* `90/91/92/93/95/96/B5/B6/C8` — all verified per table above.
+* `90/91/92/93/95/96/B5/B6/C8`, all verified per table above.
 * Commit-with-empty-table restores factory behavior instantly; binding
   writes survive device re-enumeration.
 
 Consequence of GET replies never containing binding bytes: neither
-OemDrv nor this tool can READ bindings from the device — host-side
+OemDrv nor this tool can READ bindings from the device, host-side
 state is the only source of truth. Any COMMIT write redefines the
 whole table (unused slots must be written as zeros).
 
 Button-press notify (EP2 IN, unsolicited, 9 bytes):
-`[01][class][?][code][zeros...]` — echoes the current binding of
+`[01][class][?][code][zeros...]`, echoes the current binding of
 whichever button was pressed (class/code in wire namespace); carries
 NO button index.
 
@@ -293,8 +293,8 @@ Structure known; step encoding not yet decoded.
 
 Unexplained singleton: an `f3 01 00 01` record seen on the forward
 slot in capture-1 (likely a further class/combo form). Short 2-byte OUT
-writes `0101`/`0103` (same capture) remain unidentified — polling-rate
-candidates. The lone tags `90`/`92` are now decoded — see the function
+writes `0101`/`0103` (same capture) remain unidentified, polling-rate
+candidates. The lone tags `90`/`92` are now decoded, see the function
 table above.
 
 ## Color depth findings (2026-08-24)
@@ -305,7 +305,7 @@ each channel behaves as effectively ON/OFF**. Verified by alternating
 flip tests with per-write re-arming: `FF0000`, `8B0000`, `7F0000` and
 `3F0000` all render identically. Consequences:
 
-* Use **brightness (0-4)** as the real dimmer — it scales the whole
+* Use **brightness (0-4)** as the real dimmer, it scales the whole
   LED, not the hex value.
 * Hex input stays 24-bit for compatibility; hardware snaps values.
 * Effective palette ~= 8 binary combinations x 5 brightness levels.
@@ -325,7 +325,7 @@ OemDrv):
 
 Root cause of the historical LED wedges: early experiments wrote
 Sharkoon effect ids (including invalid id 9 = "off") which this
-firmware does not accept — ids are hard-validated to 0-6 everywhere
+firmware does not accept, ids are hard-validated to 0-6 everywhere
 now. The settings-frame LED bytes work fine when values are legal and
 the parameter bank is initialized first; earlier "mirror-only" theory
 was wrong.
@@ -341,7 +341,7 @@ commit; no per-mode parameters exist.
    writes are candidates).
 4. Brightness/speed byte semantics on Blake firmware.
 5. Wire encoding of mouse-button remap targets (button->left/right/
-   middle/fire) — one targeted OemDrv capture would settle it.
+   middle/fire): one targeted OemDrv capture would settle it.
 6. Disable-function tag; remaining special tags (0x97-0x9A shortcut
    zone; anything beyond); owner of slot 57.
 7. Whether class 0x01's modifier is fixed Ctrl or selectable.

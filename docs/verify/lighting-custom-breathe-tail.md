@@ -5,10 +5,10 @@
 ## Protocol facts
 
 These modes use the same settings-frame write as every other mode
-(effect id 2 = custom breathe, id 4 = tail) — no dedicated opcodes.
+(effect id 2 = custom breathe, id 4 = tail): no dedicated opcodes.
 They only render when:
 
-1. Byte [41] (color-slot enable mask) carries `0x7F` — leaving it 0
+1. Byte [41] (color-slot enable mask) carries `0x7F`, leaving it 0
    makes both modes render dark even though the write is accepted.
 2. The commit frame matches the vendor layout, including payload
    bytes `0xB5 @32`, `0xB6 @37`, `0xC8 @52`.

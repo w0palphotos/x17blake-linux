@@ -28,7 +28,7 @@ across subsequent replug.
 
 Note: a hardware review (frontum.co.uk) claims LOD is fixed at ~3 mm
 on this model; the vendor protocol nevertheless exposes three levels,
-and the setting sticks in the frame — treat the physical effect of
+and the setting sticks in the frame, treat the physical effect of
 each level as uncharacterized.
 
 ## Related code

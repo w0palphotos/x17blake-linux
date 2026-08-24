@@ -1,7 +1,7 @@
 # Testing without installing
 
 Everything here runs straight from the source tree. The driver is pure
-Python stdlib — there is nothing to compile.
+Python stdlib, there is nothing to compile.
 
 ## Portability notes for other machines
 
@@ -14,7 +14,7 @@ Python stdlib — there is nothing to compile.
   rule applies inside WSL if you run udev there.
 - **Python**: >= 3.9, no third-party packages.
 - **Permissions**: without the udev rule every device open fails with
-  EACCES — that is expected; install the rule or run under sudo for a
+  EACCES, that is expected; install the rule or run under sudo for a
   one-off test.
 
 Everything below assumes Linux with the mouse plugged in.
@@ -39,7 +39,7 @@ python3 -m x17blake show
 ```
 
 That's it. `python3 -m x17blake <command>` always executes YOUR working
-tree — every edit applies instantly, nothing is copied anywhere.
+tree, every edit applies instantly, nothing is copied anywhere.
 
 ## 2. Isolated environment (venv)
 
@@ -59,7 +59,7 @@ images use method 1 instead.
 ## 3. Checking which code your `x17blake` command runs
 
 If you ever installed with `pip install .`, the console script uses a
-FROZEN COPY in site-packages — it will not see later edits. Symptoms:
+FROZEN COPY in site-packages, it will not see later edits. Symptoms:
 your fixes "don't work". Diagnose:
 
 ```sh
@@ -78,10 +78,10 @@ rm -rf ~/.local/lib/python3.*/site-packages/x17blake*
 echo "$HOME/Projects/x17blake-linux" > ~/.local/lib/python3.*/site-packages/x17blake.pth
 ```
 
-(The `.pth` file makes site-packages point at your working tree — an
+(The `.pth` file makes site-packages point at your working tree, an
 editable install without pip.)
 
-## 4. Safety model — what commands may write
+## 4. Safety model: what commands may write
 
 Currently writable (verified safe):
 
@@ -98,7 +98,7 @@ x17blake reset --yes           # factory reset (recovery path)
 ```
 
 Gated behind `--experimental`: binding slots 42/47 (their physical
-buttons are not yet identified — run `tools/probe_slots.py` once to map
+buttons are not yet identified, run `tools/probe_slots.py` once to map
 them). Never writable implicitly: the b5/b6/c8 resident slots and any
 non-0xFC-tag record bytes.
 

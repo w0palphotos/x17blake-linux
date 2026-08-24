@@ -22,7 +22,7 @@ Session choreography required per command:
 3. Settings-frame SET carrying effect/speed/brightness/en/mask/palette
 4. Commit frame `04 A0 01 02 | 02 02 A5 | zeros + B5/B6/C8`
 
-Without step 2 the engine keeps rendering its previous state — bare
+Without step 2 the engine keeps rendering its previous state, bare
 follow-up SETs update storage but not the render.
 
 ## Test procedure & evidence

@@ -23,4 +23,4 @@ Shared transport facts used everywhere (details in
   64-byte interrupt OUT frames on EP3, replies arrive on EP2 IN.
 * Frame envelope: `[0x04][A0 01][cmd][payload...]`.
 * Every transaction yields two packets: the response plus a trailing
-  echo/junk frame — clients must validate both magic fields.
+  echo/junk frame, clients must validate both magic fields.

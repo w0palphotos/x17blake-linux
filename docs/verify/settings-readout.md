@@ -14,7 +14,7 @@ root (udev `uaccess`), and decode the full 64-byte settings frame.
   `bInterfaceNumber=01` (interface 0 is the boot-mouse channel).
 * GET request: `04 A0 01 01 <zeros…>` written to EP3 OUT.
 * Reply: settings frame starting `04 A0 01 01`, magic `01 02 a5`
-  at [4..6] and `02 00 a5` at [34..36] — both required, or the packet
+  at [4..6] and `02 00 a5` at [34..36], both required, or the packet
   is the trailing echo/junk frame.
 * Payload layout documented in PROTOCOL.md.
 

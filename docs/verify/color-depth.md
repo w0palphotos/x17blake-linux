@@ -23,7 +23,7 @@ Result on hardware: every dim variant rendered identically to its
 full-scale version (FF = 8B = 7F = 3F for the same channel), while
 on/off flips and mode animations remained clearly visible. A follow-up
 flip test with per-write re-arming confirmed writes land (transitions
-blink) but the rendered color does not change — i.e. quantization
+blink) but the rendered color does not change, i.e. quantization
 happens in the LED engine, not the transport.
 
 ## Consequences

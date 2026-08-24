@@ -8,14 +8,19 @@ package. Pure Python stdlib; no dependencies; no daemon.
 
 | Feature                          | State                               |
 | -------------------------------- | ----------------------------------- |
-| Read settings / device info      | ✅ tested                           |
-| **DPI stages & active stage**    | ✅ **tested end-to-end**            |
-| Lift-off distance                | ⚠️ implemented, light testing       |
-| Backup / restore / factory reset | ✅ proven during recovery           |
-| **Lighting: chroma/neon/breathe/steady/off, brightness, colors** | ✅ **tested end-to-end** |
-| Lighting: custom breathe / tail  | ✅ tested                           |
+| Read settings / device info      | ✅ [tested](docs/verify/settings-readout.md) |
+| **DPI stages & active stage**    | ✅ **[tested end-to-end](docs/verify/dpi.md)** |
+| Lift-off distance                | ✅ [verified](docs/verify/lift-off-distance.md) |
+| Backup / restore / factory reset | ✅ [proven in recovery](docs/verify/backup-restore-reset.md) |
+| **Lighting: chroma/neon/breathe/steady/off, brightness, colors** | ✅ **[tested end-to-end](docs/verify/lighting-core.md)** |
+| Lighting: custom breathe / tail  | ✅ [tested](docs/verify/lighting-custom-breathe-tail.md) |
+| Effective color resolution       | 📊 [characterized](docs/verify/color-depth.md) |
 | Button remapping                 | ❌ future work                      |
-| Polling rate                     | ❌ future work                      |
+| Polling rate                     | ❌ future work                       |
+
+Per-feature test evidence lives in
+[docs/verify/README.md](docs/verify/README.md) — protocol facts,
+commands used, and observed results for everything marked ✅.
 
 > **Note:** all lighting modes, DPI stages and recovery tooling are
 > verified in daily use. Protocol reference:

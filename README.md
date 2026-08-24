@@ -24,6 +24,31 @@ package. Pure Python stdlib; no dependencies; no daemon.
 Should also work on anything sharing the `2ea8:2203` platform
 (e.g. Sharkoon Light² 200) — untested reports welcome.
 
+## Device specifications
+
+Consensus from Fantech regional distributors, retail listings and review
+aggregators, cross-checked against the vendor driver config (`Cfg.ini`,
+sensor id `0x3325`):
+
+| Spec              | Value                                        |
+| ----------------- | -------------------------------------------- |
+| Sensor            | PixArt PMW3325 optical                       |
+| DPI               | 200 – 10,000, on-the-fly adjustable          |
+| Polling rate      | 1000 Hz                                      |
+| Tracking          | 100 IPS / 20 G acceleration                  |
+| Switches          | Huano, 20 million click lifetime             |
+| Buttons           | 7, independently programmable                |
+| Lighting          | RGB (4 zones), 7 modes, onboard memory       |
+| Cable             | 1.8 m nylon braided                          |
+| Dimensions        | 125 × 62 × 42 mm                             |
+| Weight            | ~91 g without cable (~96 g with cable)       |
+
+> Some marketplace listings (incl. Shopee Indonesia) advertise
+> "PixArt 3360", "12,000 DPI", "250 IPS / 50 G" and "Omron switches".
+> Most retailers and the driver's own config disagree — e.g. the
+> vendor DPI table exposed by this driver tops out at 10,000.
+> The 7 lighting modes match what we decoded exactly.
+
 ## Install
 
 ```sh

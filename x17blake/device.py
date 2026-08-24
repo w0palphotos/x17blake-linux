@@ -27,14 +27,14 @@ class Device:
             raise DeviceError("no response to GET; is the mouse connected?")
         return pkt
 
-    def apply(self, frame, validate=True):
+    def apply(self, frame, validate=True, commit=None):
         out = bytearray(frame)
         out[3] = protocol.CMD_SET_SETTINGS
         if validate:
             current = self.read()
             validate_mutations(current, out)
         self._port.exchange(bytes(out))
-        self._port.exchange(protocol.build_commit())
+        self._port.exchange(commit if commit is not None else protocol.build_commit())
         time.sleep(0.05)
         return self.read()
 

@@ -90,20 +90,227 @@ def build_set_settings(current):
     return frame
 
 
-def build_commit():
+def build_commit(bindings=None):
+    """Commit frame.
+
+    With bindings=None this is the plain vendor commit (permanent slot
+    residents only). With a {slot_offset: 5-byte record} dict, the given
+    key-binding records are injected into their slots — the same carrier
+    OemDrv uses for button remaps (verified against live captures).
+    """
     frame = bytearray(REPORT_SIZE)
     frame[0] = REPORT_ID
     frame[1] = (MSG_TYPE_SETTINGS >> 8) & 0xFF
     frame[2] = MSG_TYPE_SETTINGS & 0xFF
     frame[3] = CMD_SET_SETTINGS
     frame[4:7] = bytes([0x02, 0x02, 0xA5])
-    frame[32] = 0xB5
-    frame[37] = 0xB6
-    frame[52] = 0xC8
+    frame[32] = SLOT_RESIDENT_B5
+    frame[37] = SLOT_RESIDENT_B6
+    frame[52] = SLOT_RESIDENT_C8
+    if bindings:
+        for offset, record in bindings.items():
+            if len(record) != 5:
+                raise ValueError("binding record must be exactly 5 bytes")
+            if offset % 5 != 2:
+                raise ValueError(f"bad binding slot offset {offset}")
+            if offset in SLOT_RESIDENTS:
+                raise ValueError(
+                    f"offset {offset} holds a permanent resident; "
+                    f"refusing implicit write"
+                )
+            frame[offset : offset + 5] = record
     return frame
 
 
+def parse_commit(frame):
+    """Decode key-binding records from a commit-frame payload.
+
+    Only tag-0xFC records are returned; permanent slot residents
+    (b5/b6/c8) and any foreign tags are ignored.
+    """
+    found = {}
+    for offset in COMMIT_SLOT_OFFSETS:
+        chunk = bytes(frame[offset : offset + 5])
+        if not chunk or chunk[0] != BINDING_TAG_KEYBOARD:
+            continue
+        rec = decode_binding(chunk)
+        if rec is not None:
+            found[offset] = rec
+    return found
+
+
 COLOR_SLOTS_ALL = 0x7F
+
+
+# --- Key binding table -------------------------------------------------
+#
+# The commit frame doubles as the button-remap carrier: offsets 22..63
+# hold 5-byte slots (bases 22, 27, 32, 37, 42, 47, 52). Three bases are
+# permanent residents even in factory commits; the rest carry one
+# remap record each when set:
+#
+#     [tag][class][code][00][00]
+#
+#   tag 0xFC; class 0x00 = plain keyboard key (HID usage id,
+#   Q=0x14, X=0x1B); class 0x01 = MODIFIED keyboard key — verified
+#   live 2026-08-24: `fc 01 13` fired Ctrl+P (browser print dialog),
+#   so class 0x01 adds a Ctrl-style modifier to the same HID usage
+#   space. The wire encoding for mouse-BUTTON targets (bind a button
+#   to left/right/middle/...) is still unknown; Cfg.ini's 11..15/A8/A9/AE
+#   values are the Windows UI namespace only and do NOT appear on the
+#   wire like that.
+#
+# Verified live against OemDrv captures AND Linux-written records:
+# forward->Q/X typed correctly, slot 22/27 ownership confirmed.
+
+BINDING_TAG_KEYBOARD = 0xFC
+KEY_CLASS_KEYBOARD = 0x00
+KEY_CLASS_KEYBOARD_CTRL = 0x01
+
+# Bare-tag records ([T][00][00][00][00]) assign built-in functions.
+# Decoded live 2026-08-24 by relocating candidates into verified slots
+# and observing the effect (no VM captures needed):
+SPECIAL_FUNCTIONS = {
+    0x90: "volume_up",
+    0x91: "volume_down",
+    0x92: "mute",
+    0x93: "play_pause",
+    0x94: "stop",           # inert without media context; inferred slot
+    0x95: "prev_track",
+    0x96: "next_track",
+    0xB5: "scroll_up",
+    0xB6: "scroll_down",
+    0xC8: "led_cycle",      # cycles lighting color mode
+}
+SPECIAL_FUNCTION_TAGS = {v: k for k, v in SPECIAL_FUNCTIONS.items()}
+
+SLOT_RESIDENT_B5 = 0xB5
+SLOT_RESIDENT_B6 = 0xB6
+SLOT_RESIDENT_C8 = 0xC8
+SLOT_RESIDENTS = {
+    32: SLOT_RESIDENT_B5,
+    37: SLOT_RESIDENT_B6,
+    52: SLOT_RESIDENT_C8,
+}
+
+COMMIT_SLOT_OFFSETS = (22, 27, 32, 37, 42, 47, 52)
+
+# Slot ownership verified live 2026-08-24 (relocate experiments +
+# user-perceived effects, cross-checked against capture-1):
+SLOT_NAMES = {
+    27: "forward",
+    22: "back",
+    42: "dpi_minus",
+    47: "dpi_plus",
+}
+VERIFIED_SLOTS = frozenset((22, 27, 42, 47))
+EXPERIMENTAL_SLOTS = frozenset((57,))
+
+# Cfg.ini UI namespace (installer defaults). Reference only — these
+# are NOT wire codes for mouse-button targets.
+MOUSE_BUTTON_CODES = {
+    "left": 0x11,
+    "middle": 0x12,
+    "right": 0x13,
+    "forward": 0x14,
+    "back": 0x15,
+    "dpi_down": 0x19,
+    "dpi_up": 0x1A,
+    "scroll_up": 0xA8,
+    "scroll_down": 0xA9,
+    "fire": 0xAE,
+}
+MOUSE_BUTTON_NAMES = {v: k for k, v in MOUSE_BUTTON_CODES.items()}
+
+_HID_SPECIAL = {
+    "esc": 0x29,
+    "tab": 0x2B,
+    "space": 0x2C,
+    "enter": 0x28,
+    "backspace": 0x2A,
+    "capslock": 0x39,
+}
+
+
+def hid_keyboard_code(name):
+    """Resolve a keyboard key name (or raw 0xNN) to a HID usage id."""
+    text = str(name).strip().lower()
+    if text in _HID_SPECIAL:
+        return _HID_SPECIAL[text]
+    if len(text) == 4 and text.startswith("0x"):
+        code = int(text, 16)
+        if not 0x04 <= code <= 0xE7:
+            raise ValueError(f"hid usage {text} outside writable range")
+        return code
+    if len(text) == 2 and text.startswith("f") and text[1:].isdigit():
+        n = int(text[1:])
+        if 1 <= n <= 12:
+            return 0x3A + (n - 1)
+    if len(text) == 1 and "a" <= text <= "z":
+        return 0x04 + (ord(text) - ord("a"))
+    raise ValueError(f"unknown keyboard key '{name}'")
+
+
+def keyboard_code_name(code):
+    for letter_index, base in enumerate(range(0x04, 0x04 + 26)):
+        if code == base:
+            return chr(ord("a") + letter_index)
+    if 0x3A <= code <= 0x45:
+        return f"f{code - 0x3A + 1}"
+    for name, special in _HID_SPECIAL.items():
+        if code == special:
+            return name
+    return f"0x{code:02X}"
+
+
+def encode_binding(key_class, code):
+    return bytes([BINDING_TAG_KEYBOARD, key_class & 0xFF, code & 0xFF, 0, 0])
+
+
+def encode_special(tag):
+    """Bare-tag function record, e.g. encode_special(0x90) = volume up."""
+    if tag not in SPECIAL_FUNCTIONS:
+        raise ValueError(
+            f"unknown special function tag {tag:#04x}; known: "
+            + ", ".join(sorted(SPECIAL_FUNCTIONS.values()))
+        )
+    return bytes([tag, 0, 0, 0, 0])
+
+
+def decode_binding(record):
+    if len(record) != 5 or record == b"\x00\x00\x00\x00\x00":
+        return None
+    tag, key_class, code = record[0], record[1], record[2]
+    if record[1:] == b"\x00\x00\x00\x00" and tag in SPECIAL_FUNCTIONS:
+        name = SPECIAL_FUNCTIONS[tag]
+        return {"class": "special", "code": tag, "name": name}
+    if tag != BINDING_TAG_KEYBOARD:
+        return {"raw": record.hex(), "note": "unknown tag"}
+    if key_class == KEY_CLASS_KEYBOARD:
+        return {"class": "keyboard", "code": code, "name": keyboard_code_name(code)}
+    if key_class == KEY_CLASS_KEYBOARD_CTRL:
+        # verified live: fc 01 13 fired Ctrl+P (print dialog)
+        return {
+            "class": "keyboard_ctrl",
+            "code": code,
+            "name": f"ctrl+{keyboard_code_name(code)}",
+        }
+    return {"class": f"unknown_{key_class:#04x}", "code": code, "name": f"0x{code:02X}"}
+
+
+def parse_notify(payload):
+    """Decode a 9-byte button-press notify from EP2 IN.
+
+    Layout: [01][class][?][code][zeros...] — echoes the current binding
+    of whichever physical button was pressed (no button index present).
+    """
+    if len(payload) < 9 or payload[0] != 0x01:
+        return None
+    rec = decode_binding(bytes([BINDING_TAG_KEYBOARD, payload[1], payload[3], 0, 0]))
+    if rec is None:
+        return None
+    rec["status"] = payload[2]
+    return rec
 
 
 def build_factory_reset():

@@ -235,6 +235,204 @@ def cmd_lod(args):
         return 0 if ok else 3
 
 
+# --- key bindings ------------------------------------------------------
+
+def _bindings_path():
+    return os.path.join(STATE_DIR, "bindings.json")
+
+
+def _load_bindings():
+    """Tracked binding entries: [{slot, class, code, name}, ...]."""
+    try:
+        with open(_bindings_path()) as fh:
+            entries = json.load(fh)
+    except FileNotFoundError:
+        return []
+    return [e for e in entries if isinstance(e, dict) and "slot" in e]
+
+
+def _save_bindings(entries):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(_bindings_path(), "w") as fh:
+        json.dump(entries, fh, indent=2)
+        fh.write("\n")
+
+
+def _entries_to_table(entries):
+    """Stored entries -> {offset: 5-byte record}."""
+    class_map = {
+        "keyboard": protocol.KEY_CLASS_KEYBOARD,
+        "keyboard_ctrl": protocol.KEY_CLASS_KEYBOARD_CTRL,
+    }
+    table = {}
+    for e in entries:
+        if e["class"] == "special":
+            table[int(e["slot"])] = protocol.encode_special(int(e["code"]))
+            continue
+        cls = class_map.get(e["class"])
+        if cls is None:
+            raise SafetyError(f"unknown stored binding class {e['class']!r}")
+        table[int(e["slot"])] = protocol.encode_binding(cls, int(e["code"]))
+    return table
+
+
+def _format_slot(offset):
+    name = protocol.SLOT_NAMES.get(offset, f"0x{offset:02X}")
+    star = "" if offset in protocol.VERIFIED_SLOTS else " (unmapped)"
+    return f"{name}{star}"
+
+
+def _describe_table(entries):
+    if not entries:
+        return ["  (no custom bindings — all buttons factory-default)"]
+    lines = []
+    for e in sorted(entries, key=lambda x: x["slot"]):
+        target = e["name"]
+        if e["class"] == "keyboard":
+            target += " (keyboard)"
+        lines.append(f"  {_format_slot(int(e['slot'])):20s} -> {target}")
+    return lines
+
+
+def cmd_keys(args):
+    action = args.action or "show"
+
+    if action == "show":
+        entries = _load_bindings()
+        if args.json:
+            print(json.dumps(entries, indent=2))
+        else:
+            print("tracked button bindings (local state — the device never")
+            print("reports bindings back; bindings made in OemDrv are invisible here):")
+            for line in _describe_table(entries):
+                print(line)
+        return 0
+
+    if action == "bind":
+        if not args.slot:
+            _fail("bind requires a slot: forward|back|42|47 [--experimental]")
+        if len(args.slot) != 1:
+            _fail("bind takes exactly one slot")
+        if args.mouse is not None:
+            _fail(
+                "mouse-button targets are not yet decodable on the wire "
+                "(Cfg.ini codes are UI-only); use --key or --hid for now"
+            )
+        offset = _resolve_slot(args.slot[0], args.experimental)
+        key_class, code, label = _resolve_target(args)
+
+        entries = [e for e in _load_bindings() if int(e["slot"]) != offset]
+        class_name = {
+            protocol.KEY_CLASS_KEYBOARD: "keyboard",
+            protocol.KEY_CLASS_KEYBOARD_CTRL: "keyboard_ctrl",
+            "special": "special",
+        }[key_class]
+        entries.append({"slot": offset, "class": class_name, "code": code, "name": label})
+
+        with Device() as dev:
+            _write_bindings(dev, entries)
+        _save_bindings(entries)
+        print(f"bound {_format_slot(offset)} -> {label}; current table:")
+        for line in _describe_table(entries):
+            print(line)
+        return 0
+
+    if action == "clear":
+        if not args.slot and not args.all:
+            _fail("clear requires at least one slot (or --all)")
+        targets = {_resolve_slot(name, args.experimental) for name in args.slot}
+        entries = _load_bindings()
+        kept = [
+            e for e in entries
+            if not (int(e["slot"]) in targets and _may_touch(int(e["slot"]), args.experimental))
+        ]
+        if args.all:
+            kept = []
+        removed = len(entries) - len(kept)
+        if not removed and not args.all:
+            print("nothing to clear for the given slot(s)")
+            return 0
+        with Device() as dev:
+            _write_bindings(dev, kept)
+        _save_bindings(kept)
+        if removed:
+            print(f"cleared {removed} binding(s);", end=" ")
+        else:
+            print("wrote empty binding table;", end=" ")
+        print("current table:")
+        for line in _describe_table(kept):
+            print(line)
+        return 0
+
+    _fail(f"unknown keys action '{action}'")
+
+
+def _may_touch(offset, experimental):
+    return offset in protocol.VERIFIED_SLOTS or experimental
+
+
+def _resolve_slot(name, experimental):
+    text = str(name).strip().lower()
+    named = {v: k for k, v in protocol.SLOT_NAMES.items()}
+    if text in named:
+        offset = named[text]
+    else:
+        try:
+            offset = int(text, 16) if text.startswith("0x") else int(text)
+        except ValueError:
+            known = ", ".join(sorted(set(protocol.SLOT_NAMES.values())))
+            _fail(f"unknown slot '{name}'\n  known: {known}")
+        if offset not in protocol.COMMIT_SLOT_OFFSETS or offset in protocol.SLOT_RESIDENTS:
+            _fail(f"offset {offset} is not an assignable binding slot")
+    if not _may_touch(offset, experimental):
+        _fail(
+            f"slot {text} is not yet mapped to a physical button "
+            "(run tools/probe_slots.py first); pass --experimental to force"
+        )
+    return offset
+
+
+def _resolve_target(args):
+    given = [v for v in (args.key, args.hid, args.special) if v is not None]
+    if len(given) != 1:
+        _fail("choose exactly one of --key KEY, --special FN, --hid 0xNN")
+    if args.special is not None:
+        name = args.special.strip().lower()
+        tag = protocol.SPECIAL_FUNCTION_TAGS.get(name)
+        if tag is None:
+            _fail(
+                f"unknown special function '{args.special}'\n  known: "
+                + ", ".join(sorted(protocol.SPECIAL_FUNCTION_TAGS))
+            )
+        return "special", tag, name
+    if args.key is not None:
+        try:
+            code = protocol.hid_keyboard_code(args.key)
+        except ValueError as err:
+            _fail(str(err))
+        return protocol.KEY_CLASS_KEYBOARD, code, args.key.lower()
+    try:
+        code = int(args.hid, 16) if args.hid.startswith("0x") else int(args.hid)
+    except ValueError:
+        _fail(f"--hid expects a number, got '{args.hid}'")
+    if not 0 <= code <= 0xE7:
+        _fail("--hid code must be 0..0xE7")
+    return protocol.KEY_CLASS_KEYBOARD, code, f"hid:{code:#04x}"
+
+
+def _write_bindings(dev, entries):
+    """Apply the full binding table: SET(current) + COMMIT(records)."""
+    current = dev.read()
+    save_backup(current, label="auto-prewrite")
+    commit = protocol.build_commit(_entries_to_table(entries))
+    dev.apply(bytes(current), validate=False, commit=commit)
+    time.sleep(0.05)
+    state = dev.read()
+    if diff_bytes(state, current):
+        raise SafetyError("settings frame changed during binding write")
+    return state
+
+
 
 def cmd_backup(args):
     with Device() as dev:
@@ -331,6 +529,7 @@ def cmd_preset(args):
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "description": args.description or "",
             "frame_hex": bytes(frame).hex(),
+            "bindings": _load_bindings(),
         }
         with open(path, "w") as fh:
             json.dump(record, fh, indent=2)
@@ -361,6 +560,11 @@ def cmd_preset(args):
                 print("dry run; add --yes to apply")
                 return 0
             state = _flash_frame(dev, frame)
+            bindings = record.get("bindings")
+            if bindings is not None:
+                _write_bindings(dev, bindings)
+                _save_bindings(bindings)
+                print(f"restored {len(bindings)} binding(s) from preset")
         _show_pretty(state)
         return 0
 
@@ -398,38 +602,97 @@ class FriendlyParser(argparse.ArgumentParser):
         super().error(message)
 
 
+_RAW = argparse.RawDescriptionHelpFormatter
+
+
 def main(argv=None):
     parser = FriendlyParser(
         prog="x17blake",
-        description="Fantech X17 Blake (Wings Tech 2ea8:2203) configurator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Fantech X17 Blake (Wings Tech 2ea8:2203) Linux configurator\n\n"
+            "Buttons, DPI, lift-off distance, lighting and presets —\n"
+            "straight over hidraw, no vendor software needed."
+        ),
+        epilog=(
+            "examples:\n"
+            "  x17blake show                              current state (--json for scripts)\n"
+            "  x17blake dpi 1600                          set ACTIVE stage dpi\n"
+            "  x17blake stage 3 2000                      set stage 1-7 individually\n"
+            "  x17blake lod 2                             lift-off distance 1-3\n"
+            "  x17blake led chroma --brightness 4         rainbow mode\n"
+            "  x17blake led steady --color FF0000         solid red\n"
+            "  x17blake led off                           lights out\n"
+            "  x17blake keys                              show button bindings\n"
+            "  x17blake keys bind forward --key b         Forward types 'b'\n"
+            "  x17blake keys bind back --special mute     Back toggles mute\n"
+            "  x17blake keys clear --all                  factory button behavior\n"
+            "  x17blake preset save daily                 snapshot everything\n"
+            "  x17blake reset --yes                       factory reset (recovery)\n"
+            "\n"
+            "every mutating command auto-backups first and refuses to write\n"
+            "fields that are not verified-safe; see also PROTOCOL.md and\n"
+            "tools/explore_bindings.py for protocol research."
+        ),
     )
-    sub = parser.add_subparsers(dest="command", required=True, metavar="command")
+    sub = parser.add_subparsers(dest="command", metavar="command")
+
+    p = sub.add_parser("help", help="show help (optionally for a command)")
+    p.add_argument("topic", nargs="?", metavar="COMMAND",
+                   help="print detailed help for COMMAND")
+    p.set_defaults(func=None)
 
     p = sub.add_parser("info", help="list matching hidraw nodes")
     p.set_defaults(func=cmd_info)
 
-    p = sub.add_parser("show", help="pretty-print current settings")
+    p = sub.add_parser(
+        "show", help="pretty-print current settings",
+        description="Reads the device settings frame and renders it "
+                    "(or dumps JSON with --json). Read-only.")
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.set_defaults(func=cmd_show)
 
-    p = sub.add_parser("probe", help="raw debug dump of the settings frame")
-    p.add_argument("--roundtrip", action="store_true")
+    p = sub.add_parser(
+        "probe", help="raw debug dump of the settings frame",
+        description="Hexdump of the live settings frame; with --roundtrip "
+                    "also writes the identical frame back and verifies "
+                    "nothing changed (transport sanity check).")
+    p.add_argument("--roundtrip", action="store_true",
+                   help="write-read-verify identity of the settings frame")
     p.set_defaults(func=cmd_probe)
 
-    p = sub.add_parser("dpi", help="set dpi of the ACTIVE stage")
+    p = sub.add_parser(
+        "dpi", help="set dpi of the ACTIVE stage",
+        description="Sets both axes of the active DPI stage. Valid values: "
+                    "200..10000 in steps of 100 (sensor table).")
     p.add_argument("dpi", type=int, metavar="DPI")
     p.set_defaults(func=cmd_dpi)
 
-    p = sub.add_parser("stage", help="set dpi of a specific stage")
+    p = sub.add_parser(
+        "stage", help="set dpi of a specific stage",
+        description="Configures one of the seven hardware stages without "
+                    "switching to it.")
     p.add_argument("index", type=int, metavar="1-7")
     p.add_argument("dpi", type=int, metavar="DPI")
     p.set_defaults(func=cmd_stage)
 
-    p = sub.add_parser("led", help="lighting control (Blake-native modes)")
+    p = sub.add_parser(
+        "led", formatter_class=_RAW, help="lighting control (Blake-native modes)",
+        description=(
+            "Modes: chroma (rainbow cycle), neon, custom_breathe, breathe, "
+            "tail, steady (solid palette color), off.\n"
+            "Brightness 0-4 is the real dimmer — hex colors are effectively "
+            "ON/OFF per channel on this firmware."),
+        epilog=(
+            "examples:\n"
+            "  x17blake led tail --brightness 3\n"
+            "  x17blake led steady --color 00FF00\n"
+            "  x17blake led custom_breathe --speed 1"))
     p.add_argument("effect", nargs="?", metavar="MODE",
                    help="chroma, neon, custom_breathe, breathe, tail, off, steady")
     p.add_argument("--brightness", type=int, choices=range(0, 5), metavar="0-4")
-    p.add_argument("--speed", type=int, choices=range(0, 3), metavar="0-2")
+    p.add_argument("--speed", type=int, choices=range(0, 3), metavar="0-2",
+                   help="animation speed (lower = faster)")
     p.add_argument("--color", metavar="RRGGBB", help="paint all 7 color slots")
     p.set_defaults(func=cmd_led)
 
@@ -437,27 +700,91 @@ def main(argv=None):
     p.add_argument("level", type=int, choices=(1, 2, 3), metavar="1-3")
     p.set_defaults(func=cmd_lod)
 
+    p = sub.add_parser(
+        "keys", formatter_class=_RAW, help="button remapping (show / bind / clear)",
+        description=(
+            "Bind physical buttons to keyboard keys or built-in functions. "
+            "Slots forward/back/dpi_minus/dpi_plus are verified; the device "
+            "never reports bindings back, so state is tracked locally "
+            "(~/.config/x17blake/bindings.json)."),
+        epilog=(
+            "examples:\n"
+            "  x17blake keys bind forward --key b       Forward types 'b'\n"
+            "  x17blake keys bind back --special mute   Back toggles mute\n"
+            "  x17blake keys bind dpi_minus --special volume_down\n"
+            "  x17blake keys bind forward --hid 0x14    raw HID usage id\n"
+            "  x17blake keys clear back                 unbind one slot\n"
+            "  x17blake keys clear --all                factory behavior\n"
+            "\n"
+            "special functions: " + ", ".join(
+                sorted(protocol.SPECIAL_FUNCTION_TAGS)) + "\n"
+            "keyboard keys: a-z, f1-f12, esc, tab, enter, space,\n"
+            "               backspace, capslock"))
+    p.add_argument("action", nargs="?", choices=("show", "bind", "clear"),
+                   default="show")
+    p.add_argument("slot", nargs="*", metavar="SLOT",
+                   help="forward | back | dpi_minus | dpi_plus | 57")
+    p.add_argument("--key", metavar="KEY",
+                   help="keyboard target: a-z, 0-9, f1-f12, esc/tab/enter/space")
+    p.add_argument("--special", metavar="FN",
+                   help="built-in function: volume_up/down, mute, play_pause, "
+                        "prev/next_track, stop, scroll_up/down, led_cycle")
+    p.add_argument("--mouse", metavar="BUTTON",
+                   help="not yet decodable on the wire; rejected with an explanation")
+    p.add_argument("--hid", metavar="0xNN", help="raw HID usage id")
+    p.add_argument("--experimental", action="store_true",
+                   help="allow slots whose physical button is not yet mapped")
+    p.add_argument("--all", action="store_true", help="clear every binding")
+    p.add_argument("--json", action="store_true", help="machine-readable show output")
+    p.set_defaults(func=cmd_keys)
+
     p = sub.add_parser("backup", help="snapshot current device state")
     p.add_argument("label", nargs="?", default="manual")
     p.set_defaults(func=cmd_backup)
 
-    p = sub.add_parser("restore", help="apply a saved backup")
+    p = sub.add_parser(
+        "restore", help="apply a saved backup",
+        description="Diffs the backup against the device first; without "
+                    "--yes it is a dry run.")
     p.add_argument("file", metavar="FILE")
     p.add_argument("--yes", action="store_true", help="actually write (default: dry run)")
     p.set_defaults(func=cmd_restore)
 
-    p = sub.add_parser("preset", help="list / save / apply named presets")
+    p = sub.add_parser(
+        "preset", help="list / save / apply named presets",
+        description="Full-state snapshots stored as JSON (device frame plus "
+                    "button bindings). Bundled: initial-factory.")
     p.add_argument("action", choices=("list", "save", "apply"))
     p.add_argument("name", nargs="?", help="preset name")
     p.add_argument("-d", "--description", help="note stored with preset save")
     p.add_argument("--yes", action="store_true", help="apply without dry run")
     p.set_defaults(func=cmd_preset)
 
-    p = sub.add_parser("reset", help="factory reset (not yet available)")
+    p = sub.add_parser(
+        "reset", help="factory reset (recovery path)",
+        description="Sends the vendor restore frame. Follow with an "
+                    "unplug/replug. Use when lighting or bindings misbehave.")
     p.add_argument("--yes", action="store_true")
     p.set_defaults(func=cmd_reset)
 
+    def _cmd_help(args):
+        if args.topic:
+            target = sub.choices.get(args.topic)
+            if target is None:
+                parser.error(
+                    f"unknown command '{args.topic}' (choose from "
+                    f"{', '.join(c for c in sub.choices if c != 'help')})")
+            target.print_help()
+        else:
+            parser.print_help()
+        return 0
+
+    sub.choices["help"].set_defaults(func=_cmd_help)
+
     args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 0
     try:
         return args.func(args)
     except SafetyError as err:

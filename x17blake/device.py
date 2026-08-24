@@ -34,5 +34,26 @@ class Device:
             current = self.read()
             validate_mutations(current, out)
         self._port.exchange(bytes(out))
+        self._port.exchange(protocol.build_commit())
+        time.sleep(0.05)
+        return self.read()
+
+    def led_begin_session(self):
+        for _ in range(2):
+            for step in range(4):
+                self._port.exchange(protocol.build_init_step(step))
+
+    def led_apply(self, frame, enable, brightness, validate=True):
+        out = bytearray(frame)
+        out[3] = protocol.CMD_SET_SETTINGS
+        if validate:
+            current = self.read()
+            validate_mutations(current, out)
+        self.led_begin_session()
+        for param_frame in protocol.build_led_params(enable, brightness):
+            self._port.exchange(param_frame)
+        out[39] = max(0, min(protocol.LED_MAX_BRIGHTNESS, brightness))
+        self._port.exchange(bytes(out))
+        self._port.exchange(protocol.build_commit())
         time.sleep(0.05)
         return self.read()

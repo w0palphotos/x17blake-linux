@@ -9,16 +9,13 @@ HEADER_MAGIC = bytes([0x01, 0x02, 0xA5])
 TRAILER_MAGIC = bytes([0x02, 0x00, 0xA5])
 
 LED_EFFECTS = {
-    0: "pulsating_rgb_cycle",
-    1: "pulsating",
-    2: "permanent",
-    3: "color_change",
-    4: "single_color_marquee",
-    5: "multi_color_marquee",
-    6: "ripple",
-    7: "trigger",
-    8: "heartbeat",
-    9: "off",
+    0: "chroma",
+    1: "neon",
+    2: "custom_breathe",
+    3: "breathe",
+    4: "tail",
+    5: "off",
+    6: "steady",
 }
 
 _DPI_SET = [
@@ -157,17 +154,107 @@ def settings_from_packets(packets):
 
 
 EFFECT_NAMES = {
-    "pulsating_rgb_cycle": 0,
-    "pulsating": 1,
-    "permanent": 2,
-    "color_change": 3,
-    "single_color_marquee": 4,
-    "multi_color_marquee": 5,
-    "ripple": 6,
-    "trigger": 7,
-    "heartbeat": 8,
-    "off": 9,
+    "chroma": 0,
+    "neon": 1,
+    "custom_breathe": 2,
+    "breathe": 3,
+    "tail": 4,
+    "steady": 5,
+    "off": 6,
 }
+
+LED_MIN_EFFECT = 0
+LED_MAX_EFFECT = 6
+LED_MAX_BRIGHTNESS = 4
+LED_MAX_SPEED = 2
+
+
+def resolve_effect(text):
+    if text.lstrip("+-").isdigit():
+        eid = int(text, 0)
+        if not LED_MIN_EFFECT <= eid <= LED_MAX_EFFECT:
+            raise ValueError(
+                f"effect id {eid} out of range; valid ids are "
+                f"{LED_MIN_EFFECT}..{LED_MAX_EFFECT} — ids outside this "
+                f"range corrupt the engine"
+            )
+        return eid
+    eid = EFFECT_NAMES.get(text)
+    if eid is None:
+        raise ValueError(
+            f"unknown effect '{text}'; known: {', '.join(sorted(EFFECT_NAMES))}"
+        )
+    return eid
+
+
+LED_PARAM_TEMPLATES = {
+    0: bytes.fromhex(
+        "04a4030001040100ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+    1: bytes.fromhex(
+        "04a4030100000100ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+    2: bytes.fromhex(
+        "04a40302000a0100ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+    3: bytes.fromhex(
+        "04a4030300000100ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+    4: bytes.fromhex(
+        "04a4030400000100ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+    5: bytes.fromhex(
+        "04a4030500000100ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+    6: bytes.fromhex(
+        "04a4030600000000ff000000ff000000ffff00ffffff0000ffffffffff"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ),
+}
+
+
+def build_led_params(enable, brightness):
+    out = []
+    for param in (1, 2, 3, 4, 5, 6, 0):
+        frame = bytearray(LED_PARAM_TEMPLATES[param])
+        if param == 0:
+            frame[4] = 1 if enable else 0
+            frame[5] = max(0, min(LED_MAX_BRIGHTNESS, brightness))
+        out.append(bytes(frame))
+    return out
+
+
+def build_init_step(step):
+    frame = bytearray(REPORT_SIZE)
+    frame[0] = REPORT_ID
+    frame[1] = 0xA1
+    frame[2] = 0x02
+    frame[3] = step & 0xFF
+    return frame
+
+
+def set_effect(frame, effect):
+    if not LED_MIN_EFFECT <= effect <= LED_MAX_EFFECT:
+        raise ValueError(f"effect {effect} outside valid range 0..6")
+    frame[37] = effect
+
+
+def set_speed(frame, speed):
+    if not 0 <= speed <= LED_MAX_SPEED:
+        raise ValueError(f"speed must be 0..{LED_MAX_SPEED}")
+    frame[38] = speed
+
+
+def set_brightness(frame, level):
+    if not 0 <= level <= LED_MAX_BRIGHTNESS:
+        raise ValueError(f"brightness must be 0..{LED_MAX_BRIGHTNESS}")
+    frame[39] = level
 
 
 def stage_offset(index):

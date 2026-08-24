@@ -12,16 +12,15 @@ package. Pure Python stdlib; no dependencies; no daemon.
 | **DPI stages & active stage**    | ✅ **tested end-to-end**            |
 | Lift-off distance                | ⚠️ implemented, light testing       |
 | Backup / restore / factory reset | ✅ proven during recovery           |
-| Lighting (LED effects/colors)    | ❌ not implemented — see note below |
+| **Lighting: chroma/neon/breathe/steady/off, brightness, colors** | ✅ **tested end-to-end** |
+| Lighting: custom breathe / tail  | ⚠️ pending per-mode param decode    |
 | Button remapping                 | ❌ future work                      |
 | Polling rate                     | ❌ future work                      |
 
-> **Note:** only DPI control has been verified by daily use so far.
-> Everything else is under active development. On this firmware the
-> lighting state does NOT live in the settings frame we can write —
-> naive LED writes corrupt the engine (details in
-> [PROTOCOL.md](PROTOCOL.md)) — so lighting stays unimplemented until
-> the vendor opcodes are decoded from a labeled capture.
+> **Note:** DPI and the main lighting modes are verified in daily use.
+> `custom_breathe`/`tail` need per-mode parameters still being decoded
+> (see [PROTOCOL.md](PROTOCOL.md)). Full protocol documentation,
+> including the reverse-engineering story, lives there too.
 
 Should also work on anything sharing the `2ea8:2203` platform
 (e.g. Sharkoon Light² 200) — untested reports welcome.
@@ -53,6 +52,12 @@ x17blake info                  # list hidraw nodes
 x17blake dpi 1600              # set dpi of the ACTIVE stage (200-10000)
 x17blake stage 3 2000          # set stage 1-7 individually
 x17blake lod 2                 # lift-off distance 1-3
+
+# Lighting — modes: chroma, neon, breathe, steady, off
+# (custom_breathe / tail land in a later release)
+x17blake led steady --color FF0000 --brightness 4
+x17blake led chroma
+x17blake led off
 
 x17blake backup [label]        # snapshot state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
@@ -92,7 +97,8 @@ For reverse-engineering new features start at
 
 ## Roadmap
 
-- [ ] Lighting via decoded vendor opcodes (blocked on capture)
+- [x] Lighting: chroma / neon / breathe / steady / off + brightness + colors
+- [ ] Lighting: custom breathe / tail (per-mode param capture pending)
 - [ ] Button remapping (`A7` channel layout)
 - [ ] Polling rate control
 - [ ] TUI frontend (on top of the CLI library layer)

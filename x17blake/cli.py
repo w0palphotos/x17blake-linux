@@ -161,6 +161,59 @@ def _resolve_effect(text):
 
 
 
+
+def cmd_led(args):
+    effect_id = None
+    if args.effect is not None:
+        try:
+            effect_id = protocol.resolve_effect(args.effect)
+        except ValueError as err:
+            _fail(str(err))
+
+    brightness = 4 if args.brightness is None else args.brightness
+    enable = effect_id != protocol.EFFECT_NAMES["off"] if effect_id is not None else True
+    rgb = _parse_color(args.color) if args.color else None
+
+    def mut(f):
+        if effect_id is not None:
+            protocol.set_effect(f, effect_id)
+        if args.speed is not None:
+            protocol.set_speed(f, args.speed)
+        if rgb is not None:
+            for i in range(1, 8):
+                protocol.set_stage_color(f, i, rgb)
+        protocol.set_brightness(f, brightness)
+        f[40] = 1
+
+    what = "led"
+    if effect_id is not None:
+        what += f" mode={args.effect}"
+    what += f" brightness={brightness}"
+    if args.speed is not None:
+        what += f" speed={args.speed}"
+    if rgb is not None:
+        what += f" color={args.color}"
+
+    with Device() as dev:
+        current = dev.read()
+        save_backup(current, label="auto-prewrite")
+        new = bytearray(current)
+        mut(new)
+        validate_mutations(current, new)
+        out = bytearray(new)
+        out[3] = protocol.CMD_SET_SETTINGS
+        dev.led_begin_session()
+        for param_frame in protocol.build_led_params(enable, brightness):
+            dev._port.exchange(param_frame)
+        dev._port.exchange(bytes(out))
+        dev._port.exchange(protocol.build_commit())
+        time.sleep(0.05)
+        state = dev.read()
+    print(f"{what}: applied")
+    _show_pretty(state)
+    return 0
+
+
 def cmd_lod(args):
     with Device() as dev:
 
@@ -267,6 +320,14 @@ def main(argv=None):
     p.add_argument("index", type=int, metavar="1-7")
     p.add_argument("dpi", type=int, metavar="DPI")
     p.set_defaults(func=cmd_stage)
+
+    p = sub.add_parser("led", help="lighting control (Blake-native modes)")
+    p.add_argument("effect", nargs="?", metavar="MODE",
+                   help="chroma, neon, custom_breathe, breathe, tail, off, steady")
+    p.add_argument("--brightness", type=int, choices=range(0, 5), metavar="0-4")
+    p.add_argument("--speed", type=int, choices=range(0, 3), metavar="0-2")
+    p.add_argument("--color", metavar="RRGGBB", help="paint all 7 color slots")
+    p.set_defaults(func=cmd_led)
 
     p = sub.add_parser("lod", help="lift-off distance")
     p.add_argument("level", type=int, choices=(1, 2, 3), metavar="1-3")

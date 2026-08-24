@@ -170,17 +170,42 @@ factory-reset frame + power cycle. Lesson encoded in tooling: writes are
 restricted to verified field offsets; unknown-field writes require
 explicit override; auto-backup before every mutation.
 
-## LED findings (2026-08-23, post-incident)
+## Lighting — SOLVED (2026-08-24, verified live)
 
-Writing bytes 37-41 / 42-62 through the settings frame is HARMFUL on
-Blake firmware: the lighting engine accepts renders briefly, then dies
-(at replug at latest), and the block reverts writes. Factory reset
-frame revives it, but repeated wedges suggest NVM-level corruption.
-The real lighting control must use a different opcode family
-(candidates: `AA`, `A7` variants) — decode from a labeled Windows
-OemDrv capture before any further LED experiments. The CLI therefore
-blocks these fields (`state.MUTABLE_OFFSETS`) and ships no led/color
-commands.
+Blake effect ids (settings-frame byte 37) — **completely different from
+the Sharkoon table**:
+
+| Id | Mode | Renders from Linux |
+|----|------|--------------------|
+| 0 | chroma (rainbow cycle) | ✅ |
+| 1 | neon | ✅ |
+| 2 | custom breathe | ⚠️ dark — needs per-mode params |
+| 3 | breathe | ✅ |
+| 4 | tail | ⚠️ dark — needs per-mode params |
+| 5 | steady (solid palette) | ✅ |
+| 6 | off | ✅ |
+
+Other fields: byte 38 speed, byte 39 brightness (**0-4**, 0 = off),
+byte 40 enable (=1), bytes 42-62 = 7x RGB palette.
+
+Session choreography required before lighting writes (as emitted by
+OemDrv):
+
+1. `A1 02 {00,01,02,03}` x2 (init handshake)
+2. `A4 03 <param>` frames 1..6 then 0 (parameter bank init; templates
+   in `protocol.LED_PARAM_TEMPLATES`; param 0 = [enable, brightness])
+3. Settings-frame SET with effect/speed/brightness/en/palette
+4. Commit frame (`02 02 a5` zeros)
+
+Root cause of the historical LED wedges: early experiments wrote
+Sharkoon effect ids (including invalid id 9 = "off") which this
+firmware does not accept — ids are hard-validated to 0-6 everywhere
+now. The settings-frame LED bytes work fine when values are legal and
+the parameter bank is initialized first; earlier "mirror-only" theory
+was wrong.
+
+Open: per-mode parameters for custom_breathe/tail (ids 2/4) — targeted
+VM re-capture planned while clicking those modes with option tweaks.
 
 ## Open questions
 

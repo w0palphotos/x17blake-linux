@@ -2,8 +2,34 @@ import struct
 import sys
 
 
-def parse_pcapng_usb(path):
+def parse_pcap(path):
     data = open(path, "rb").read()
+    if len(data) < 24:
+        return []
+    magic = data[:4]
+    if magic == b"\x0a\x0d\x0d\x0a":
+        return _parse_pcapng(data)
+    if magic in (b"\xa1\xb2\xc3\xd4", b"\xd4\xc3\xb2\xa1"):
+        return _parse_pcap_classic(data, magic)
+    raise ValueError(f"unknown capture magic {magic.hex()}")
+
+
+def _parse_pcap_classic(data, magic):
+    swapped = magic == b"\xa1\xb2\xc3\xd4"
+    packets = []
+    off = 24
+    fmt = ">IIII" if swapped else "<IIII"
+    while off + 16 <= len(data):
+        _, _, incl, _orig = struct.unpack_from(fmt, data, off)
+        off += 16
+        if incl > len(data) - off:
+            break
+        packets.append(data[off : off + incl])
+        off += incl
+    return packets
+
+
+def _parse_pcapng(data):
     packets = []
     off = 0
     while off + 12 <= len(data):
@@ -11,10 +37,8 @@ def parse_pcapng_usb(path):
         if blen < 12 or off + blen > len(data):
             break
         if btype == 6:
-            ifid, ts_hi, ts_lo = struct.unpack_from("<III", data, off + 8)
             caplen, origlen = struct.unpack_from("<II", data, off + 20)
-            pkt = data[off + 28 : off + 28 + caplen]
-            packets.append(pkt)
+            packets.append(data[off + 28 : off + 28 + caplen])
         off += blen
     return packets
 
@@ -35,7 +59,7 @@ def usb_payload(pkt):
 
 def frames(path):
     out = []
-    for pkt in parse_pcapng_usb(path):
+    for pkt in parse_pcap(path):
         parsed = usb_payload(pkt)
         if not parsed:
             continue

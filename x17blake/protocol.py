@@ -97,7 +97,13 @@ def build_commit():
     frame[2] = MSG_TYPE_SETTINGS & 0xFF
     frame[3] = CMD_SET_SETTINGS
     frame[4:7] = bytes([0x02, 0x02, 0xA5])
+    frame[32] = 0xB5
+    frame[37] = 0xB6
+    frame[52] = 0xC8
     return frame
+
+
+COLOR_SLOTS_ALL = 0x7F
 
 
 def build_factory_reset():

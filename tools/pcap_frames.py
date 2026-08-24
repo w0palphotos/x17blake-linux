@@ -47,13 +47,27 @@ USB_HEADER = 64
 
 
 def usb_payload(pkt):
-    if len(pkt) <= USB_HEADER:
+    """Decode a usbmon mmapped record (tcpdump classic pcap).
+
+    Header layout (Documentation/usb/usbmon.txt):
+      [0:8]  urb id
+      [8]    event type b'S'/b'C'/b'E'
+      [9]    transfer type (0 iso, 1 intr, 2 control, 3 bulk)
+      [10]   endpoint | 0x80 when IN
+      [11]   device address
+      [12:15] bus number
+      [64:]  data
+    """
+    if len(pkt) <= 64:
         return None
-    flags = struct.unpack_from("<H", pkt, 8)[0]
-    direction = (flags >> 15) & 1
-    ep_num = (flags >> 7) & 0x7F
-    xfer_type = flags & 0x3
-    payload = bytes(pkt[USB_HEADER:])
+    event = pkt[8]
+    if event != ord("S"):
+        return None
+    xfer_type = pkt[9]
+    ep_byte = pkt[10]
+    direction = 1 if ep_byte & 0x80 else 0
+    ep_num = ep_byte & 0x7F
+    payload = bytes(pkt[64:])
     return direction, ep_num, xfer_type, payload
 
 

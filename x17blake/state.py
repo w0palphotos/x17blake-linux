@@ -52,7 +52,7 @@ def diff_bytes(before, after):
 
 HEADER_OFFSETS = frozenset(range(0, 4))
 MUTABLE_OFFSETS = frozenset(
-    [7, *range(9, 30), 33, *range(37, 41), *range(42, 63)]
+    [7, *range(9, 30), 33, *range(37, 42), *range(42, 63)]
 )
 FORBIDDEN_NOTE = (
     "LED/profile fields (37-41, 42-62) are write-blocked: on this firmware "

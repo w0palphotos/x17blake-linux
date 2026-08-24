@@ -184,6 +184,7 @@ def cmd_led(args):
                 protocol.set_stage_color(f, i, rgb)
         protocol.set_brightness(f, brightness)
         f[40] = 1
+        f[41] = protocol.COLOR_SLOTS_ALL
 
     what = "led"
     if effect_id is not None:

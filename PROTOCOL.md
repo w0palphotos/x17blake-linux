@@ -179,14 +179,38 @@ the Sharkoon table**:
 |----|------|--------------------|
 | 0 | chroma (rainbow cycle) | ✅ |
 | 1 | neon | ✅ |
-| 2 | custom breathe | ⚠️ dark — needs per-mode params |
+| 2 | custom breathe | ✅ |
 | 3 | breathe | ✅ |
-| 4 | tail | ⚠️ dark — needs per-mode params |
+| 4 | tail | ✅ |
 | 5 | steady (solid palette) | ✅ |
 | 6 | off | ✅ |
 
 Other fields: byte 38 speed, byte 39 brightness (**0-4**, 0 = off),
-byte 40 enable (=1), bytes 42-62 = 7x RGB palette.
+byte 40 enable (=1), **byte 41 = color-slot enable bitmask (0x7f = all
+seven)** — required for custom breathe / tail to render — bytes 42-62 =
+7x RGB palette.
+
+Commit frame (`02 02 a5` variant) is NOT all-zero: the vendor sends
+**0xB5 @32, 0xB6 @37, 0xC8 @52** inside it (the device's so-called
+"junk echo" frames are echoes of these). `protocol.build_commit()`
+replicates it byte-exact.
+
+## Color depth findings (2026-08-24)
+
+Although the interface accepts full 8-bit-per-channel RGB (the
+"16.8M colors" marketing figure), **rendered output is quantized:
+each channel behaves as effectively ON/OFF**. Verified by alternating
+flip tests with per-write re-arming: `FF0000`, `8B0000`, `7F0000` and
+`3F0000` all render identically. Consequences:
+
+* Use **brightness (0-4)** as the real dimmer — it scales the whole
+  LED, not the hex value.
+* Hex input stays 24-bit for compatibility; hardware snaps values.
+* Effective palette ~= 8 binary combinations x 5 brightness levels.
+
+Also confirmed: the lighting engine only refreshes its render state
+when freshly armed (INIT + parameter bank preceding each write).
+Sparse bare SETs update storage but may not re-render.
 
 Session choreography required before lighting writes (as emitted by
 OemDrv):
@@ -204,8 +228,8 @@ now. The settings-frame LED bytes work fine when values are legal and
 the parameter bank is initialized first; earlier "mirror-only" theory
 was wrong.
 
-Open: per-mode parameters for custom_breathe/tail (ids 2/4) — targeted
-VM re-capture planned while clicking those modes with option tweaks.
+Solved: custom breathe / tail render with byte41=0x7f + vendor-exact
+commit; no per-mode parameters exist.
 
 ## Open questions
 

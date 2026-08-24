@@ -43,8 +43,8 @@ virtual addresses via section headers (`objdump -h`): for `.rdata`,
 | `0x43c5e0`                     | reader thread (interface 1 input reports)                          |
 | `0x43ce10–0x43d630`            | message builders cluster (opener/GET/SET/commit/A7)                |
 | `0x43d130`                     | GET settings; parses reply payload at offset +5 into caller struct |
-| `0x43cfe0`                     | SET settings (variant A `01 02 A5`, then commit B `02 02 A5`)      |
-| `0x43d240`                     | key/binding upload channel (`A7 ...`) — layout still open          |
+| `0x43cfe0`                     | SET settings (variant A `01 02 A5`, then commit B `02 02 a5`)      |
+| `0x43d240`                     | macro/key-list upload channel (`A7 ...`) — step encoding still open; simple button remaps ride the COMMIT frame instead |
 | globals `0x5d9020`, `0x5d8fe0` | receive buffers                                                    |
 
 Frame grammar and byte layouts: see PROTOCOL.md.
@@ -67,6 +67,31 @@ Frame grammar and byte layouts: see PROTOCOL.md.
    - https://holland.sh/post/crafting-drivers-libusb/
    - https://blog.lx862.com/blog/2024-05-13-reverse-engineering-a-mouse/
    - https://github.com/santeri3700/hyperx_pulsefire_dart_reverse_engineering
+
+## Decoding without the VM (2026-08-24)
+
+Once the commit-frame binding table was understood from pcaps, the rest
+of the button semantics were decoded entirely from Linux — no Windows
+captures needed. The technique, now automated in
+`tools/explore_bindings.py`:
+
+1. **Relocate** an unknown record (e.g. bare tag `90`) into a slot
+   whose physical button is known (forward = offset 27).
+2. **Press and observe three channels**: the config-channel notify
+   echo (`[01][class][code]`, keyboard-class records only), the
+   boot-mouse reports on interface 0 (click bits / wheel), and a GET
+   settings delta afterwards (active stage / profile changes).
+3. For functions with no observable side channel (volume, mute,
+   media), ask the operator what they perceived — one press per
+   candidate, five candidates per round.
+4. **Bisect safely first**: `--single` writes one record and checks the
+   device survives it (some functions re-enumerate the USB device when
+   pressed; writes themselves never did).
+
+This decoded the full special-function table (volume/media/scroll/
+LED-cycle), the slot->button map for dpi-/dpi+, and falsified the
+Cfg.ini mouse-button-code assumption (`fc 01 13` is Ctrl+P, not
+right-click) in a single session.
 
 If you ever need deeper static work, Ghidra (headless) gives function
 boundaries that raw objdump lacks; everything above was done with objdump

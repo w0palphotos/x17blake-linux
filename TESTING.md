@@ -89,15 +89,22 @@ Currently writable (verified safe):
 x17blake dpi <200..10000>      # active stage
 x17blake stage <1-7> <dpi>
 x17blake lod <1|2|3>
+x17blake led <mode> [--brightness 0-4] [--color RRGGBB]
+x17blake keys bind forward --key x     # keyboard remap, verified slots
+x17blake keys clear --all
 x17blake backup [label]
 x17blake restore <file> [--yes]
 x17blake reset --yes           # factory reset (recovery path)
 ```
 
-Deliberately absent: `led` / `color` / `profile`. On this firmware those
-fields are NOT controlled by the settings frame — writing them corrupts
-the lighting engine until `reset`. They return once the true lighting
-opcodes are decoded (see REVERSING.md).
+Gated behind `--experimental`: binding slots 42/47 (their physical
+buttons are not yet identified — run `tools/probe_slots.py` once to map
+them). Never writable implicitly: the b5/b6/c8 resident slots and any
+non-0xFC-tag record bytes.
+
+Mouse-button remap targets (bind a button to right/middle/...) are not
+offered yet: their wire encoding is still unknown (see PROTOCOL.md,
+key-bindings section).
 
 Every mutating command auto-saves a backup to
 `~/.config/x17blake/` before touching the device.
@@ -112,3 +119,17 @@ python3 -m x17blake dpi $(python3 -c "import sys;sys.path.insert(0,'.');from x17
 ```
 
 If all four pass, transport, parser, guardrails and write+verify work.
+
+## 6. Key-binding verification
+
+```sh
+python3 -m x17blake keys bind forward --key x
+# press the Forward thumb button -> 'x' appears (verified 2026-08-24)
+python3 -m x17blake keys clear --all
+# buttons behave factory-normal again immediately
+```
+
+Bindings live in commit-frame slots; the device never reports them
+back, so `keys show` prints locally tracked state only. One run of
+`tools/probe_slots.py` identifies which slot belongs to each remaining
+physical button (~1 minute, restores previous bindings afterwards).

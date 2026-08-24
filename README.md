@@ -15,14 +15,15 @@ package. Pure Python stdlib; no dependencies; no daemon.
 | **Lighting: chroma/neon/breathe/steady/off, brightness, colors** | ✅ **[tested end-to-end](docs/verify/lighting-core.md)** |
 | Lighting: custom breathe / tail  | ✅ [tested](docs/verify/lighting-custom-breathe-tail.md) |
 | Effective color resolution       | 📊 [characterized](docs/verify/color-depth.md) |
-| Button remapping                 | ❌ future work                      |
+| **Button remapping (keyboard + built-in functions)** | ✅ **[tested end-to-end](docs/verify/keys-remapping.md)** |
+| Button remapping: mouse-button targets | ❌ wire encoding still unknown  |
 | Polling rate                     | ❌ future work                       |
 
 Per-feature test evidence lives in
 [docs/verify/README.md](docs/verify/README.md) — protocol facts,
 commands used, and observed results for everything marked ✅.
 
-> **Note:** all lighting modes, DPI stages and recovery tooling are
+> **Note:** lighting, DPI, button remapping and recovery tooling are
 > verified in daily use. Protocol reference:
 > [PROTOCOL.md](PROTOCOL.md).
 
@@ -92,6 +93,18 @@ x17blake led off
 # Color tip: channels are effectively ON/OFF on this firmware —
 # use --brightness 0-4 for darker shades, not dark hex values.
 
+# Button remapping — keyboard keys and built-in functions
+x17blake keys                              # show tracked bindings
+x17blake keys bind forward --key x         # Forward thumb button types 'x'
+x17blake keys bind back --special mute     # built-in functions:
+x17blake keys bind dpi_plus --special volume_up   #   volume_up/down, mute,
+x17blake keys bind dpi_minus --special scroll_down  # play_pause, prev/next,
+x17blake keys bind forward --hid 0x14      #   stop, led_cycle, ...
+x17blake keys clear --all                  # back to factory behavior
+
+x17blake help                              # full command overview
+x17blake help keys                         # detailed help for one command
+
 x17blake backup [label]        # snapshot state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
 x17blake reset --yes           # factory reset (recovery path)
@@ -137,7 +150,10 @@ For reverse-engineering new features start at
 
 - [x] Lighting: chroma / neon / breathe / steady / off + brightness + colors
 - [x] Lighting: custom breathe / tail
-- [ ] Button remapping (`A7` channel layout)
+- [x] Button remapping: keyboard keys, Ctrl-combos and built-in functions
+      (volume/media/scroll/LED-cycle) — decoded entirely from Linux
+- [ ] Button remapping: mouse-button targets (wire encoding unknown)
 - [ ] Polling rate control
+- [ ] Macro support (`AA`/`A7`/`A8` upload trio structurally known)
 - [ ] TUI frontend (on top of the CLI library layer)
 - [ ] RPM packaging, COPR

@@ -195,6 +195,108 @@ Commit frame (`02 02 a5` variant) is NOT all-zero: the vendor sends
 "junk echo" frames are echoes of these). `protocol.build_commit()`
 replicates it byte-exact.
 
+## Key bindings — DECODED (2026-08-24, from OemDrv captures)
+
+The **commit frame doubles as the button-remap carrier**. Its payload
+region reuses offsets 22-63 as a table of 5-byte slots (bases 22, 27,
+32, 37, 42, 47, 52). The historical "magic" bytes `b5@32 / b6@37 /
+c8@52` are simply permanent slot residents present even in factory
+commits — not protocol junk.
+
+Record layout per occupied slot:
+
+```
+[tag][class][code][00][00]
+tag   = 0xFC for all known classes
+class = 0x00 keyboard, plain   -> code = HID usage id (Q=0x14, X=0x1B)
+class = 0x01 keyboard, Ctrl+?  -> code = HID usage id of the base key
+```
+
+Evidence: `fc 00 14` appeared exactly in the fwd->Q capture, `fc 00 1b`
+in fwd->X captures; each Apply produced only SET+COMMIT pairs —
+settings frames never carry bindings.
+
+**Live Linux write verification (2026-08-24):**
+
+* `fc 00 1b` on slot 27 (forward) — button typed `x`. ✅
+* `fc 01 13` on slot 22 (back) — fired **Ctrl+P** (browser print
+  dialog), NOT right-click. This proves class 0x01 is a modified
+  keyboard key and that Cfg.ini's `01 13 R` notation is the Windows UI
+  namespace only. The wire encoding for mouse-button targets (bind a
+  physical button to left/right/middle/scroll/fire) remains UNKNOWN —
+  one targeted OemDrv capture still needed for that.
+* Both bindings cleared via commit-with-empty-table; buttons returned
+  to factory behavior instantly (no power cycle needed).
+
+Slot -> button map (ownership verified live 2026-08-24):
+
+| Offset | Button | Status |
+|--------|--------|--------|
+| 22 | back | verified (capture + Linux write) |
+| 27 | forward | verified (capture + Linux write) |
+| 32 | b5 resident | not a remap target; see function table below |
+| 37 | b6 resident | ditto |
+| 42 | dpi- | verified via relocate experiments |
+| 47 | dpi+ | verified via relocate experiments |
+| 52 | c8 resident | ditto |
+| 57 | ? | accepts records; owning button unidentified |
+
+### Bare-tag function records — DECODED LIVE (2026-08-24)
+
+Single-byte records `[T][00][00][00][00]` assign built-in functions.
+Decoded by relocating candidate tags into verified slots and observing
+the effect on Linux — no Windows captures involved:
+
+| Tag | Function |
+|-----|----------|
+| 0x90 | volume up |
+| 0x91 | volume down |
+| 0x92 | mute |
+| 0x93 | play/pause |
+| 0x94 | stop (inferred; inert without media) |
+| 0x95 | previous track |
+| 0x96 | next track |
+| 0xB5 | scroll up (= wheel's factory resident @32) |
+| 0xB6 | scroll down (= wheel's factory resident @37) |
+| 0xC8 | lighting-mode cycle (= resident @52) |
+
+The residents at 32/37/52 are therefore factory wheel-up / wheel-down /
+LED-cycle assignments stored in the same table. Special-function
+bindings do NOT emit button-press notifies. Tags 0x97-0x9A emit
+keyboard-like output (`98`=Mod+R, `99`=Mod+F, `9A`='d') — a separate
+shortcut space, mapping uncatalogued.
+
+**Live Linux write verification (2026-08-24):**
+
+* `fc 00 1b` @27 — Forward typed `x`.
+* `fc 01 13` @22 — fired **Ctrl+P** (print dialog), NOT right-click:
+  class 0x01 is a modified keyboard key; Cfg.ini's `01 13 R` notation
+  is the Windows UI namespace only. Mouse-button wire targets remain
+  UNKNOWN.
+* `90/91/92/93/95/96/B5/B6/C8` — all verified per table above.
+* Commit-with-empty-table restores factory behavior instantly; binding
+  writes survive device re-enumeration.
+
+Consequence of GET replies never containing binding bytes: neither
+OemDrv nor this tool can READ bindings from the device — host-side
+state is the only source of truth. Any COMMIT write redefines the
+whole table (unused slots must be written as zeros).
+
+Button-press notify (EP2 IN, unsolicited, 9 bytes):
+`[01][class][?][code][zeros...]` — echoes the current binding of
+whichever button was pressed (class/code in wire namespace); carries
+NO button index.
+
+Macro upload trio (capture-1): `AA 00` opener -> `A7 01 00 3c` ->
+`A8 01 | 01 01 37 01 <zeros> | step data @38..` (timed key events).
+Structure known; step encoding not yet decoded.
+
+Unexplained singleton: an `f3 01 00 01` record seen on the forward
+slot in capture-1 (likely a further class/combo form). Short 2-byte OUT
+writes `0101`/`0103` (same capture) remain unidentified — polling-rate
+candidates. The lone tags `90`/`92` are now decoded — see the function
+table above.
+
 ## Color depth findings (2026-08-24)
 
 Although the interface accepts full 8-bit-per-channel RGB (the
@@ -234,10 +336,16 @@ commit; no per-mode parameters exist.
 ## Open questions
 
 1. Meaning of byte 8 (enabled mask = 0x01 while 7 stages configured?).
-2. Exact A7 frame layout (slot index / code mapping) for button remapping.
-3. Polling-rate command layout (Cfg.ini `DR=0x500` hint).
+2. Macro step-data encoding inside the `AA`/`A7`/`A8` upload trio.
+3. Polling-rate command layout (Cfg.ini `DR=0x500`; short `0101`/`0103`
+   writes are candidates).
 4. Brightness/speed byte semantics on Blake firmware.
-5. Byte 41 purpose (not writable via settings frame).
+5. Wire encoding of mouse-button remap targets (button->left/right/
+   middle/fire) — one targeted OemDrv capture would settle it.
+6. Disable-function tag; remaining special tags (0x97-0x9A shortcut
+   zone; anything beyond); owner of slot 57.
+7. Whether class 0x01's modifier is fixed Ctrl or selectable.
+8. Byte 41 purpose (not writable via settings frame).
 
 ## Methodology references
 

@@ -36,19 +36,23 @@ sudo tcpdump -i usbmon<N> -s0 -w captures/<segment>.pcap
 ## Segment checklist
 
 Confirmed against the actual OemDrv UI (Key assignment / DPI / LED /
-Parameter / Macros pages):
+Parameter / Macros pages). **Update 2026-08-24:** segments 5-7 are
+OBSOLETE — button semantics were decoded entirely from Linux via the
+relocate-and-press technique (see REVERSING.md and
+`tools/explore_bindings.py`); no VM capture needed. Remaining valuable
+segments marked with ❗.
 
-| # | Segment name | Action inside OemDrv | Unlocks |
-|---|---|---|---|
-| 1 | `param-polling` | cycle each polling-rate option | polling-rate opcode |
-| 2 | `param-sensitivity` | sensitivity slider: set 1 -> Apply, then 20 -> Apply | sensitivity byte (1-20) |
-| 3 | `param-scroll` | scroll-speed slider: 1 -> Apply, then 10 -> Apply | scroll-speed byte (1-10) |
-| 4 | `param-dblclick` | double-click slider: 830 -> Apply, then 200 -> Apply | debounce field (16-bit ms?) |
-| 5 | `key-fwd-keyb` | remap Forward -> keyboard key "B", Apply | `A7` binding layout |
-| 6 | `key-back-media` | remap Back -> media key, Apply | key-class codes |
-| 7 | `key-disable` | any button -> Disable | disable encoding |
-| 8 | `macro-record-shortcut` | record keyboard shortcut, save | macro blob format |
-| 9 | `macro-assign` | assign macro to thumb button | assignment linkage |
+| # | Segment name | Action inside OemDrv | Unlocks | Status |
+|---|---|---|---|---|
+| 1 | `param-polling` ❗ | cycle each polling-rate option | polling-rate opcode | open (short `0101`/`0103` writes are candidates) |
+| 2 | `param-sensitivity` ❗ | sensitivity slider: 1 -> Apply, then 20 -> Apply | sensitivity byte (1-20) | open |
+| 3 | `param-scroll` ❗ | scroll-speed slider: 1 -> Apply, then 10 -> Apply | scroll-speed byte (1-10) | open |
+| 4 | `param-dblclick` ❗ | double-click slider: 830 -> Apply, then 200 -> Apply | debounce field (16-bit ms?) | open |
+| ~~5~~ | ~~key-fwd-keyb~~ | — | — | decoded from Linux |
+| ~~6~~ | ~~key-back-media~~ | — | — | decoded from Linux (function tags) |
+| ~~7~~ | ~~key-disable~~ | any button -> Disable | disable encoding | still unknown; a 30 s capture would settle it |
+| 8 | `macro-record-shortcut` ❗ | record keyboard shortcut, save | macro blob format (`AA`->`A7`->`A8` trio) | structure known, steps open |
+| 9 | `macro-assign` ❗ | assign macro to thumb button | assignment linkage | open |
 
 Settings that produce ZERO new frames during capture are Windows-side
 only — document and skip them (Linux has native pointer/scroll
@@ -56,7 +60,8 @@ acceleration).
 
 Already-decoded segments (do not redo): startup burst, DPI writes,
 mode switching for all seven effects, brightness slider, Restore
-button, commit-frame behavior.
+button, commit-frame behavior, **all simple key remaps** (commit-frame
+binding table + function tags; see PROTOCOL.md).
 
 ## Decode workflow
 
@@ -81,10 +86,10 @@ Known unknowns at time of writing:
 
 | Topic | Hint |
 |---|---|
-| `A7` frames | key/binding upload channel; builder at OemDrv.exe `0x43d240`; carries per-key records during macro/key-list processing |
-| Polling rate | `Cfg.ini` hint `DR=0x500`; likely a short dedicated frame |
-| `AA 00` frame | sent near macro processing; purpose unclear |
-| Commit payload `B5/B6/C8` | required for full render updates; semantics unknown |
+| Macro step data | `AA 00` -> `A7 01 00 3c` -> `A8 01` trio carries timed key events (see PROTOCOL.md key-bindings section) |
+| Polling rate | `Cfg.ini` hint `DR=0x500`; short `0101`/`0103` writes are candidates |
+| Class tags `90`/`92`/`f3` | lone-slot records seen once; likely disable/media/combo classes |
+| Commit payload `b5/b6/c8` | permanent binding-slot residents; owners unknown |
 
 ## Pitfalls (all encountered live)
 

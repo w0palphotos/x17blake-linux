@@ -14,6 +14,7 @@ Fedora 44, kernel hidraw transport).
 | [lighting-core.md](lighting-core.md) | chroma / neon / breathe / steady / off, brightness, colors | ✅ end-to-end |
 | [lighting-custom-breathe-tail.md](lighting-custom-breathe-tail.md) | custom breathe / tail modes | ✅ end-to-end |
 | [color-depth.md](color-depth.md) | Effective color resolution | ✅ characterized |
+| [keys-remapping.md](keys-remapping.md) | Button remapping (keyboard + special functions) | ✅ end-to-end |
 
 Shared transport facts used everywhere (details in
 [PROTOCOL.md](../../PROTOCOL.md)):

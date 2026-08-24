@@ -35,16 +35,24 @@ sudo tcpdump -i usbmon<N> -s0 -w captures/<segment>.pcap
 
 ## Segment checklist
 
+Confirmed against the actual OemDrv UI (Key assignment / DPI / LED /
+Parameter / Macros pages):
+
 | # | Segment name | Action inside OemDrv | Unlocks |
 |---|---|---|---|
-| 1 | `polling-<rate>` | each polling-rate option, one file each | polling-rate opcode |
-| 2 | `button-fwd-keyb` | remap Forward button -> keyboard key "B", Apply | `A7` binding layout |
-| 3 | `button-back-media` | remap Back -> media key, Apply | key-class codes |
-| 4 | `button-disable` | set any button -> Disable | disable encoding |
-| 5 | `button-defaults` | Restore defaults on key page | reset vs A7 interplay |
-| 6 | `macro-record` | record 3-click macro, save, assign | macro blob format |
-| 7 | `cb-color-picker` | Custom Breathe -> pick dark red, Apply | color quantization check |
-| 8 | `debounce` | Parameter page debounce options, if present | extra settings bytes |
+| 1 | `param-polling` | cycle each polling-rate option | polling-rate opcode |
+| 2 | `param-sensitivity` | sensitivity slider: set 1 -> Apply, then 20 -> Apply | sensitivity byte (1-20) |
+| 3 | `param-scroll` | scroll-speed slider: 1 -> Apply, then 10 -> Apply | scroll-speed byte (1-10) |
+| 4 | `param-dblclick` | double-click slider: 830 -> Apply, then 200 -> Apply | debounce field (16-bit ms?) |
+| 5 | `key-fwd-keyb` | remap Forward -> keyboard key "B", Apply | `A7` binding layout |
+| 6 | `key-back-media` | remap Back -> media key, Apply | key-class codes |
+| 7 | `key-disable` | any button -> Disable | disable encoding |
+| 8 | `macro-record-shortcut` | record keyboard shortcut, save | macro blob format |
+| 9 | `macro-assign` | assign macro to thumb button | assignment linkage |
+
+Settings that produce ZERO new frames during capture are Windows-side
+only — document and skip them (Linux has native pointer/scroll
+acceleration).
 
 Already-decoded segments (do not redo): startup burst, DPI writes,
 mode switching for all seven effects, brightness slider, Restore

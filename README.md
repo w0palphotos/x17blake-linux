@@ -95,6 +95,11 @@ x17blake led off
 x17blake backup [label]        # snapshot state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
 x17blake reset --yes           # factory reset (recovery path)
+
+# Presets — named full-state snapshots
+x17blake preset list                       # bundled + your saved ones
+x17blake preset apply initial-factory      # dry-run diff; add --yes to apply
+x17blake preset save my-setup -d "my daily driver"
 ```
 
 Every mutating command auto-backups first and writes only to

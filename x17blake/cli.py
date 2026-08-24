@@ -1,6 +1,7 @@
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 import time
@@ -14,6 +15,12 @@ from .state import (
     load_backup,
     save_backup,
     validate_mutations,
+)
+
+STATE_DIR = os.path.expanduser("~/.config/x17blake")
+USER_PRESET_DIR = os.path.join(STATE_DIR, "presets")
+BUNDLED_PRESET_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "presets"
 )
 
 
@@ -238,6 +245,21 @@ def cmd_backup(args):
     return 0
 
 
+def _flash_frame(dev, frame):
+    """Write a full settings frame with LED engine re-arming so the
+    render follows the restored values."""
+    dev.led_begin_session()
+    brightness = max(0, min(protocol.LED_MAX_BRIGHTNESS, frame[39]))
+    for param_frame in protocol.build_led_params(True, brightness):
+        dev._port.exchange(param_frame)
+    out = bytearray(frame)
+    out[3] = protocol.CMD_SET_SETTINGS
+    dev._port.exchange(bytes(out))
+    dev._port.exchange(protocol.build_commit())
+    time.sleep(0.05)
+    return dev.read()
+
+
 def cmd_restore(args):
     frame, record = load_backup(args.file)
     with Device() as dev:
@@ -252,7 +274,7 @@ def cmd_restore(args):
         if not args.yes:
             print("dry run; add --yes to apply")
             return 0
-        state = dev.apply(bytes(frame), validate=False)
+        state = _flash_frame(dev, frame)
         remaining = diff_bytes(state, frame)
         if remaining:
             print(f"warning: {len(remaining)} byte(s) differ after write "
@@ -262,6 +284,87 @@ def cmd_restore(args):
             return 3
         print("restore: verified OK")
         return 0
+
+
+def _preset_file(name):
+    for directory in (USER_PRESET_DIR, BUNDLED_PRESET_DIR):
+        path = os.path.join(directory, f"{name}.json")
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _iter_presets():
+    found = {}
+    label = {USER_PRESET_DIR: "user", BUNDLED_PRESET_DIR: "bundled"}
+    for directory in (BUNDLED_PRESET_DIR, USER_PRESET_DIR):
+        if not os.path.isdir(directory):
+            continue
+        if os.path.commonpath([directory]) == os.path.commonpath([directory]) and os.path.isdir(directory):
+            pass
+        for fn in sorted(os.listdir(directory)):
+            if fn.endswith(".json"):
+                found.setdefault(fn[:-5], os.path.join(label[directory], fn))
+    return found
+
+
+def cmd_preset(args):
+    if args.action == "list":
+        presets = _iter_presets()
+        if not presets:
+            print("no presets (save one with: x17blake preset save <name>)")
+            return 0
+        for name, src in sorted(presets.items()):
+            print(f"{name:24s} [{src}]")
+        return 0
+
+    if not args.name:
+        _fail(f"preset {args.action} requires a name")
+
+    if args.action == "save":
+        os.makedirs(USER_PRESET_DIR, exist_ok=True)
+        with Device() as dev:
+            frame = dev.read()
+        path = os.path.join(USER_PRESET_DIR, f"{args.name}.json")
+        record = {
+            "label": args.name,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "description": args.description or "",
+            "frame_hex": bytes(frame).hex(),
+        }
+        with open(path, "w") as fh:
+            json.dump(record, fh, indent=2)
+            fh.write("\n")
+        print(f"preset saved: {path}")
+        return 0
+
+    if args.action == "apply":
+        path = _preset_file(args.name)
+        if path is None:
+            names = list(_iter_presets())
+            close = difflib.get_close_matches(args.name, names, n=1, cutoff=0.4)
+            hint = f" — did you mean '{close[0]}'?" if close else ""
+            known = ", ".join(sorted(names)) or "(none)"
+            _fail(f"unknown preset '{args.name}'{hint}\n  available: {known}")
+        frame, record = load_backup(path)
+        with Device() as dev:
+            current = dev.read()
+            changed = diff_bytes(current, frame)
+            desc = record.get("description") or record.get("timestamp", "")
+            print(f"applying preset '{args.name}' ({desc}):")
+            for i in changed:
+                print(f"  byte {i:2d}: {current[i]:#04x} -> {frame[i]:#04x}")
+            if not changed:
+                print("device already matches this preset")
+                return 0
+            if not args.yes:
+                print("dry run; add --yes to apply")
+                return 0
+            state = _flash_frame(dev, frame)
+        _show_pretty(state)
+        return 0
+
+    _fail(f"unknown preset action '{args.action}'")
 
 
 def cmd_reset(args):
@@ -342,6 +445,13 @@ def main(argv=None):
     p.add_argument("file", metavar="FILE")
     p.add_argument("--yes", action="store_true", help="actually write (default: dry run)")
     p.set_defaults(func=cmd_restore)
+
+    p = sub.add_parser("preset", help="list / save / apply named presets")
+    p.add_argument("action", choices=("list", "save", "apply"))
+    p.add_argument("name", nargs="?", help="preset name")
+    p.add_argument("-d", "--description", help="note stored with preset save")
+    p.add_argument("--yes", action="store_true", help="apply without dry run")
+    p.set_defaults(func=cmd_preset)
 
     p = sub.add_parser("reset", help="factory reset (not yet available)")
     p.add_argument("--yes", action="store_true")

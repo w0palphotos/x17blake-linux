@@ -69,9 +69,18 @@ ROUNDS = {
         "fc00ae0000",
         "fc00a80000",
     ],
+    # continuation of the bare-tag function zone (90-96 were media,
+    # 97-9A emitted keyboard-like output)
+    "sp-9b-9f": [
+        "9b00000000",
+        "9c00000000",
+        "9d00000000",
+        "9e00000000",
+        "9f00000000",
+    ],
 }
 
-ROUND_ORDER = ["relocate", "cls-02-06", "cls-07-0b", "cls-0c-10", "misc"]
+ROUND_ORDER = ["cls-02-06", "cls-07-0b", "cls-0c-10", "misc", "sp-9b-9f"]
 
 BTN_NAMES = {0x01: "LEFT-click", 0x02: "RIGHT-click", 0x04: "MIDDLE-click"}
 

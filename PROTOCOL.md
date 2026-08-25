@@ -228,18 +228,25 @@ settings frames never carry bindings.
 * Both bindings cleared via commit-with-empty-table; buttons returned
   to factory behavior instantly (no power cycle needed).
 
-Slot -> button map (ownership verified live 2026-08-24):
+Slot -> button map (fully mapped 2026-08-24, live relocate experiments):
 
-| Offset | Button | Status |
-|--------|--------|--------|
-| 22 | back | verified (capture + Linux write) |
-| 27 | forward | verified (capture + Linux write) |
-| 32 | b5 resident | not a remap target; see function table below |
-| 37 | b6 resident | ditto |
-| 42 | dpi- | verified via relocate experiments |
-| 47 | dpi+ | verified via relocate experiments |
-| 52 | c8 resident | ditto |
-| 57 | ? | accepts records; owning button unidentified |
+| Offset | Button | Default content |
+|--------|--------|-----------------|
+| 7 | left click | empty (native) |
+| 12 | right click | empty (native) |
+| 17 | middle click | empty (native) |
+| 22 | back | empty (native) |
+| 27 | forward | empty (native) |
+| 32 | wheel up | `b5` (= scroll up) |
+| 37 | wheel down | `b6` (= scroll down) |
+| 42 | dpi- | empty (native) |
+| 47 | dpi+ | empty (native) |
+| 52 | ? | `c8` (= LED cycle) |
+| 57 | unidentified | accepts records |
+
+The stride-5 slot grid therefore runs 7..52+ and covers every
+programmable button including the main clicks; rebinding left/right/
+middle themselves works exactly like in OemDrv.
 
 ### Bare-tag function records: DECODED LIVE (2026-08-24)
 
@@ -256,9 +263,21 @@ the effect on Linux, no Windows captures involved:
 | 0x94 | stop (inferred; inert without media) |
 | 0x95 | previous track |
 | 0x96 | next track |
+| 0xB0 | left click |
+| 0xB1 | right click |
+| 0xB2 | middle click |
+| 0xB3 | navigate forward (browser history) |
+| 0xB4 | navigate back (browser history) |
 | 0xB5 | scroll up (= wheel's factory resident @32) |
 | 0xB6 | scroll down (= wheel's factory resident @37) |
 | 0xC8 | lighting-mode cycle (= resident @52) |
+
+The `b0-b6` block is a complete input-action enum: any button can be
+bound to a real mouse click, and the main clicks themselves rebind
+through slots 7/12/17 exactly like in OemDrv. Class `fc 0a <code>` is a
+press-and-HOLD form: with code `0x13` the display dims while held and
+restores on release. Tags `c0-c3` showed no visible effect under
+niri/Wayland (vendor functions the compositor ignores, or no-ops).
 
 The residents at 32/37/52 are therefore factory wheel-up / wheel-down /
 LED-cycle assignments stored in the same table. Special-function
@@ -340,12 +359,12 @@ commit; no per-mode parameters exist.
 3. Polling-rate command layout (Cfg.ini `DR=0x500`; short `0101`/`0103`
    writes are candidates).
 4. Brightness/speed byte semantics on Blake firmware.
-5. Wire encoding of mouse-button remap targets (button->left/right/
-   middle/fire): one targeted OemDrv capture would settle it.
-6. Disable-function tag; remaining special tags (0x97-0x9A shortcut
-   zone; anything beyond); owner of slot 57.
-7. Whether class 0x01's modifier is fixed Ctrl or selectable.
-8. Byte 41 purpose (not writable via settings frame).
+5. Disable-function tag; remaining special tags (`c0-c7` zone inert
+   under Wayland so far; 0x97-0x9A shortcut space); button owning
+   slot 52.
+6. Whether class 0x01's modifier is fixed Ctrl or selectable; full
+   behavior map of hold-class `fc 0a`.
+7. Byte 41 purpose (not writable via settings frame).
 
 ## Methodology references
 

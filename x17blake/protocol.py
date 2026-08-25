@@ -169,7 +169,8 @@ KEY_CLASS_KEYBOARD_CTRL = 0x01
 
 # Bare-tag records ([T][00][00][00][00]) assign built-in functions.
 # Decoded live 2026-08-24 by relocating candidates into verified slots
-# and observing the effect (no VM captures needed):
+# and observing the effect (no VM captures needed). The tag space is a
+# vendor enum: 90-96 media cluster, b0-b6 input actions, c8 LED cycle.
 SPECIAL_FUNCTIONS = {
     0x90: "volume_up",
     0x91: "volume_down",
@@ -178,6 +179,11 @@ SPECIAL_FUNCTIONS = {
     0x94: "stop",           # inert without media context; inferred slot
     0x95: "prev_track",
     0x96: "next_track",
+    0xB0: "left_click",     # verified: forward slot produced real clicks
+    0xB1: "right_click",
+    0xB2: "middle_click",
+    0xB3: "nav_forward",    # browser-history forward
+    0xB4: "nav_back",       # browser-history back
     0xB5: "scroll_up",
     0xB6: "scroll_down",
     0xC8: "led_cycle",      # cycles lighting color mode
@@ -193,17 +199,21 @@ SLOT_RESIDENTS = {
     52: SLOT_RESIDENT_C8,
 }
 
-COMMIT_SLOT_OFFSETS = (22, 27, 32, 37, 42, 47, 52)
+COMMIT_SLOT_OFFSETS = (7, 12, 17, 22, 27, 32, 37, 42, 47, 52)
 
-# Slot ownership verified live 2026-08-24 (relocate experiments +
-# user-perceived effects, cross-checked against capture-1):
+# Slot ownership fully mapped 2026-08-24 (live relocate experiments,
+# cross-checked against capture-1): the stride-5 grid starts at 7 and
+# covers every programmable button incl. the main clicks.
 SLOT_NAMES = {
+    7: "left",
+    12: "right",
+    17: "middle",
     27: "forward",
     22: "back",
     42: "dpi_minus",
     47: "dpi_plus",
 }
-VERIFIED_SLOTS = frozenset((22, 27, 42, 47))
+VERIFIED_SLOTS = frozenset((7, 12, 17, 22, 27, 42, 47))
 EXPERIMENTAL_SLOTS = frozenset((57,))
 
 # Cfg.ini UI namespace (installer defaults). Reference only — these

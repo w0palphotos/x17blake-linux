@@ -701,29 +701,32 @@ def main(argv=None):
     p.set_defaults(func=cmd_lod)
 
     p = sub.add_parser(
-        "keys", formatter_class=_RAW, help="button remapping (show / bind / clear)",
+        "keys", help="button remapping (show / bind / clear)",
         description=(
-            "Bind physical buttons to keyboard keys or built-in functions. "
-            "Slots forward/back/dpi_minus/dpi_plus are verified; the device "
-            "never reports bindings back, so state is tracked locally "
-            "(~/.config/x17blake/bindings.json)."),
+            "Bind any button (including left/right/middle) to keyboard "
+            "keys, built-in functions or mouse actions. All button slots "
+            "are verified; the device never reports bindings back, so "
+            "state is tracked locally (~/.config/x17blake/bindings.json)."),
         epilog=(
             "examples:\n"
-            "  x17blake keys bind forward --key b       Forward types 'b'\n"
-            "  x17blake keys bind back --special mute   Back toggles mute\n"
-            "  x17blake keys bind dpi_minus --special volume_down\n"
-            "  x17blake keys bind forward --hid 0x14    raw HID usage id\n"
-            "  x17blake keys clear back                 unbind one slot\n"
-            "  x17blake keys clear --all                factory behavior\n"
+            "  x17blake keys bind forward --key b        Forward types 'b'\n"
+            "  x17blake keys bind back --special mute    Back toggles mute\n"
+            "  x17blake keys bind dpi_minus --special left_click\n"
+            "  x17blake keys bind left --special right_click   swap L/R\n"
+            "  x17blake keys clear --all                 factory behavior\n"
             "\n"
             "special functions: " + ", ".join(
                 sorted(protocol.SPECIAL_FUNCTION_TAGS)) + "\n"
             "keyboard keys: a-z, f1-f12, esc, tab, enter, space,\n"
-            "               backspace, capslock"))
+            "               backspace, capslock\n"
+            "\n"
+            "caution: rebinding LEFT to a non-click function is safe only\n"
+            "if you can still reach a terminal; `x17blake keys clear --all`\n"
+            "restores everything (keyboard input suffices)."))
     p.add_argument("action", nargs="?", choices=("show", "bind", "clear"),
                    default="show")
     p.add_argument("slot", nargs="*", metavar="SLOT",
-                   help="forward | back | dpi_minus | dpi_plus | 57")
+                   help="left | right | middle | back | forward | dpi_minus | dpi_plus")
     p.add_argument("--key", metavar="KEY",
                    help="keyboard target: a-z, 0-9, f1-f12, esc/tab/enter/space")
     p.add_argument("--special", metavar="FN",

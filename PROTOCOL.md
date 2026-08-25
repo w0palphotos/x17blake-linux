@@ -110,7 +110,7 @@ Verified byte-for-byte against live reads:
 | 8 | enabled-stage mask (?) | 01 |
 | 9-29 | 7 x `[00, regX, regY]` DPI stages | 000b0b, 001b1b, ... |
 | 30-32 | zeros | |
-| 33 | lift-off distance raw (UI = raw-1) | 03 (= UI 2) |
+| 33 | polling rate (0x00=125, 0x01=250, 0x02=500, 0x03=1000 Hz) | 03 (= 1000 Hz) |
 | 34-36 | 02 00 a5 | |
 | 37 | LED effect id | 06 |
 | 38-39 | LED speed / brightness | 00 00 |
@@ -134,7 +134,8 @@ active stage 1, profile 1.
 
 * Identity SET round-trip leaves state unchanged (probe --roundtrip OK).
 * Mutating stage 1 (500->800) via SET applies immediately; restore verified.
-* `dpi --stage N --dpi V`, `lod 1-3` setters verified with read-back.
+* `dpi --stage N --dpi V` setter verified with read-back.
+* `lod 1-3` writes to byte 33; see note below re: polling conflict.
 * LED color slots DRIVE the RGB (all-7-green test seen by user).
   Earlier red test was invalid: slot 1 was already FF0000.
 * LED effect byte (37) changes animations (10-id sweep visibly cycled
@@ -213,7 +214,7 @@ class = 0x01 keyboard, Ctrl+?  -> code = HID usage id of the base key
 ```
 
 Evidence: `fc 00 14` appeared exactly in the fwd->Q capture, `fc 00 1b`
-in fwd->X captures; each Apply produced only SET+COMMIT pairs —
+in fwd->X captures; each Apply produced only SET+COMMIT pairs.
 settings frames never carry bindings.
 
 **Live Linux write verification (2026-08-24):**
@@ -351,12 +352,34 @@ was wrong.
 Solved: custom breathe / tail render with byte41=0x7f + vendor-exact
 commit; no per-mode parameters exist.
 
+## Polling: SOLVED (2026-08-25, from param-polling.pcap)
+
+Settings-frame byte 33 encodes the USB polling rate:
+
+| Raw | Hz |
+|-----|-----|
+| 0x00 | 125 |
+| 0x01 | 250 |
+| 0x02 | 500 |
+| 0x03 | 1000 |
+
+Factory default is 0x03 (1000 Hz), matching `Cfg.ini DR=0x500` and the
+README spec.  The short `0101`/`0103` frames from `capture-1.pcap` are
+NOT polling commands. The poll capture (`param-polling.pcap`) showed only
+full 64-byte SET+COMMIT pairs on byte 33.
+
+Previously this byte was labeled as lift-off distance (Sharkoon reference
+`PROTOCOL.md:39`).  The LOD writes from 2026-08-23 (`lod 1-3` writing
+raw 2/3/4) were therefore setting polling, not LOD.  A hardware review
+confirms LOD is fixed at ~3 mm on this model; no LOD register is known.
+
 ## Open questions
 
 1. Meaning of byte 8 (enabled mask = 0x01 while 7 stages configured?).
 2. Macro step-data encoding inside the `AA`/`A7`/`A8` upload trio.
-3. Polling-rate command layout (Cfg.ini `DR=0x500`; short `0101`/`0103`
-   writes are candidates).
+3. ~~Polling-rate command layout~~ **SOLVED**: settings-frame byte 33 encodes
+   polling rate (0x00=125 Hz, 0x01=250, 0x02=500, 0x03=1000). See
+   `docs/verify/polling-rate.md`.
 4. Brightness/speed byte semantics on Blake firmware.
 5. Disable-function tag; remaining special tags (`c0-c7` zone inert
    under Wayland so far; 0x97-0x9A shortcut space); button owning
@@ -364,6 +387,9 @@ commit; no per-mode parameters exist.
 6. Whether class 0x01's modifier is fixed Ctrl or selectable; full
    behavior map of hold-class `fc 0a`.
 7. Byte 41 purpose (not writable via settings frame).
+8. LOD true byte: byte 33 is now confirmed as polling; the real LOD
+   register (if any) is elsewhere. The LOD writes from 2026-08-23
+   were effectively setting polling to 500/1000 Hz.
 
 ## Methodology references
 

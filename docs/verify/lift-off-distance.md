@@ -1,36 +1,25 @@
-# Verified: lift-off distance
+# Lift-off distance
 
-**Status:** ✅ verified · **Date:** 2026-08-23
+**Status:** conflicted (was: verified)
+**Original date:** 2026-08-23
 
-## Protocol facts
+## What we thought
 
-| Item | Detail |
-|---|---|
-| Storage | settings-frame byte [33] |
-| Encoding | raw = UI level + 1 (UI 1/2/3 -> 0x02/0x03/0x04) |
-| Factory value | raw 3 (UI level 2), matches `Cfg.ini DefLOD=2` |
+Byte 33 was treated as lift-off distance. Raw = UI level + 1, factory raw 3
+equals UI 2, matching `Cfg.ini DefLOD=2`. Live round-trip writes 2->3->4
+confirmed read-back, so it looked solid.
 
-## Test procedure & evidence
+## Why it's wrong
 
-```sh
-$ x17blake lod 3
-lift-off distance: -> UI level 3 (raw 4)
-verified
+On 2026-08-25 the `param-polling.pcap` capture showed OemDrv writes
+**0x00/0x01/0x02/0x03** to byte 33 when cycling 125/250/500/1000 Hz in the
+Parameter page. Factory default 0x03 is 1000 Hz. The earlier LOD test was
+therefore setting polling rate, not LOD. The read-back matched because the
+device stores any value the host writes.
 
-$ x17blake lod 2
-lift-off distance: -> UI level 2 (raw 3)
-verified
-```
-
-Round-trip 2->3->2 executed live with read-back after each write;
-both transitions confirmed in the returned frame. Value persisted
-across subsequent replug.
-
-Note: a hardware review (frontum.co.uk) claims LOD is fixed at ~3 mm
-on this model; the vendor protocol nevertheless exposes three levels,
-and the setting sticks in the frame, treat the physical effect of
-each level as uncharacterized.
+A hardware review (frontum.co.uk) says LOD is fixed at ~3 mm on this
+model. The vendor protocol exposes no known LOD register on the wire.
 
 ## Related code
 
-`protocol.set_lift_off_distance`, `cli.cmd_lod`.
+`protocol.set_lift_off_distance` (now aliases `set_polling`), `cli.cmd_lod`.

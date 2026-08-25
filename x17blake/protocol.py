@@ -232,43 +232,66 @@ MOUSE_BUTTON_CODES = {
 }
 MOUSE_BUTTON_NAMES = {v: k for k, v in MOUSE_BUTTON_CODES.items()}
 
-_HID_SPECIAL = {
+_HID_NAV_KEYS = {
     "esc": 0x29,
     "tab": 0x2B,
     "space": 0x2C,
     "enter": 0x28,
     "backspace": 0x2A,
     "capslock": 0x39,
+    "insert": 0x49,
+    "home": 0x4A,
+    "pageup": 0x4B,
+    "delete": 0x4C,
+    "end": 0x4D,
+    "pagedown": 0x4E,
+    "right": 0x4F,
+    "left": 0x50,
+    "down": 0x51,
+    "up": 0x52,
 }
+
+
+def _build_keyboard_keys():
+    keys = {}
+    for i in range(26):
+        keys[chr(ord("a") + i)] = 0x04 + i
+    for n in range(1, 10):
+        keys[str(n)] = 0x1E + (n - 1)
+    keys["0"] = 0x27
+    for n in range(1, 13):
+        keys[f"f{n}"] = 0x3A + (n - 1)
+    keys.update(_HID_NAV_KEYS)
+    return keys
+
+
+# Every named keyboard key bindable via `keys bind SLOT --key NAME`.
+HID_KEYBOARD_KEYS = _build_keyboard_keys()
+KEYBOARD_KEY_NAMES = sorted(HID_KEYBOARD_KEYS)
 
 
 def hid_keyboard_code(name):
     """Resolve a keyboard key name (or raw 0xNN) to a HID usage id."""
     text = str(name).strip().lower()
-    if text in _HID_SPECIAL:
-        return _HID_SPECIAL[text]
-    if len(text) == 4 and text.startswith("0x"):
-        code = int(text, 16)
+    if text in HID_KEYBOARD_KEYS:
+        return HID_KEYBOARD_KEYS[text]
+    if text.startswith("0x"):
+        try:
+            code = int(text, 16)
+        except ValueError:
+            raise ValueError(f"unknown keyboard key '{name}'") from None
         if not 0x04 <= code <= 0xE7:
             raise ValueError(f"hid usage {text} outside writable range")
         return code
-    if len(text) == 2 and text.startswith("f") and text[1:].isdigit():
-        n = int(text[1:])
-        if 1 <= n <= 12:
-            return 0x3A + (n - 1)
-    if len(text) == 1 and "a" <= text <= "z":
-        return 0x04 + (ord(text) - ord("a"))
-    raise ValueError(f"unknown keyboard key '{name}'")
+    raise ValueError(
+        f"unknown keyboard key '{name}'; known: "
+        + ", ".join(KEYBOARD_KEY_NAMES)
+    )
 
 
 def keyboard_code_name(code):
-    for letter_index, base in enumerate(range(0x04, 0x04 + 26)):
-        if code == base:
-            return chr(ord("a") + letter_index)
-    if 0x3A <= code <= 0x45:
-        return f"f{code - 0x3A + 1}"
-    for name, special in _HID_SPECIAL.items():
-        if code == special:
+    for name, value in HID_KEYBOARD_KEYS.items():
+        if value == code:
             return name
     return f"0x{code:02X}"
 

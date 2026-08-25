@@ -413,7 +413,7 @@ def _resolve_target(args):
         return protocol.KEY_CLASS_KEYBOARD, code, args.key.lower()
     try:
         code = int(args.hid, 16) if args.hid.startswith("0x") else int(args.hid)
-    except ValueError:
+    except (ValueError, AttributeError):
         _fail(f"--hid expects a number, got '{args.hid}'")
     if not 0 <= code <= 0xE7:
         _fail("--hid code must be 0..0xE7")
@@ -597,7 +597,7 @@ class FriendlyParser(argparse.ArgumentParser):
             options = re.findall(r"'([^']+)'", m.group(2))
             close = difflib.get_close_matches(bad, options, n=1, cutoff=0.4)
             if close:
-                print(f"error: unknown command '{bad}' — did you mean '{close[0]}'?")
+                print(f"error: invalid choice '{bad}' — did you mean '{close[0]}'?")
                 raise SystemExit(2)
         super().error(message)
 
@@ -680,8 +680,9 @@ def main(argv=None):
         "led", formatter_class=_RAW, help="lighting control (Blake-native modes)",
         description=(
             "Modes: chroma (rainbow cycle), neon, custom_breathe, breathe, "
-            "tail, steady (solid palette color), off.\n"
-            "Brightness 0-4 is the real dimmer — hex colors are effectively "
+            "tail, steady (solid palette color), off. Pass a mode name or "
+            "its numeric id 0-6.\n"
+            "Brightness 0-4 is the real dimmer; hex colors are effectively "
             "ON/OFF per channel on this firmware."),
         epilog=(
             "examples:\n"
@@ -701,7 +702,8 @@ def main(argv=None):
     p.set_defaults(func=cmd_lod)
 
     p = sub.add_parser(
-        "keys", help="button remapping (show / bind / clear)",
+        "keys", formatter_class=_RAW,
+        help="button remapping (show / bind / clear)",
         description=(
             "Bind any button (including left/right/middle) to keyboard "
             "keys, built-in functions or mouse actions. All button slots "
@@ -715,10 +717,8 @@ def main(argv=None):
             "  x17blake keys bind left --special right_click   swap L/R\n"
             "  x17blake keys clear --all                 factory behavior\n"
             "\n"
-            "special functions: " + ", ".join(
-                sorted(protocol.SPECIAL_FUNCTION_TAGS)) + "\n"
-            "keyboard keys: a-z, f1-f12, esc, tab, enter, space,\n"
-            "               backspace, capslock\n"
+            "valid targets are listed under each flag above; typos get\n"
+            "\"did you mean\" suggestions.\n"
             "\n"
             "caution: rebinding LEFT to a non-click function is safe only\n"
             "if you can still reach a terminal; `x17blake keys clear --all`\n"
@@ -727,11 +727,14 @@ def main(argv=None):
                    default="show")
     p.add_argument("slot", nargs="*", metavar="SLOT",
                    help="left | right | middle | back | forward | dpi_minus | dpi_plus")
-    p.add_argument("--key", metavar="KEY",
-                   help="keyboard target: a-z, 0-9, f1-f12, esc/tab/enter/space")
+    p.add_argument("--key", metavar="KEY", choices=protocol.KEYBOARD_KEY_NAMES,
+                   help="keyboard target; one of: "
+                        + ", ".join(protocol.KEYBOARD_KEY_NAMES)
+                        + " (raw ids: --hid 0xNN)")
     p.add_argument("--special", metavar="FN",
-                   help="built-in function: volume_up/down, mute, play_pause, "
-                        "prev/next_track, stop, scroll_up/down, led_cycle")
+                   choices=sorted(protocol.SPECIAL_FUNCTION_TAGS),
+                   help="built-in function; one of: "
+                        + ", ".join(sorted(protocol.SPECIAL_FUNCTION_TAGS)))
     p.add_argument("--mouse", metavar="BUTTON",
                    help="not yet decodable on the wire; rejected with an explanation")
     p.add_argument("--hid", metavar="0xNN", help="raw HID usage id")

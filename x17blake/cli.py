@@ -69,6 +69,7 @@ def _show_pretty(frame):
     print(f"  dpi       : {_stage_line(frame)}")
     lod = s["lift_off_distance_ui"]
     print(f"  lift-off  : {lod if lod else s['lift_off_distance_raw']}")
+    print(f"  polling   : {s['polling_hz'] or '?'} Hz")
     led = s["led_effect"]
     print(f"  led       : {led}  brightness={s['led_brightness']} speed={s['led_speed']}")
     colors = "  ".join(f"{i+1}:%02X%02X%02X" % c for i, c in enumerate(s["colors"]))
@@ -232,9 +233,23 @@ def cmd_lod(args):
             protocol.set_lift_off_distance(f, args.level)
 
         state = _mutate_and_apply(dev, mut, f"lift-off distance -> {args.level}")
-        raw = state[33]
+        raw = state[protocol.POLLING_OFFSET]
         ok = raw == args.level + 1
         print(f"verified: lift-off = {raw - 1 if raw >= 2 else raw}")
+        return 0 if ok else 3
+
+
+def cmd_polling(args):
+    with Device() as dev:
+
+        def mut(f):
+            protocol.set_polling(f, args.hz)
+
+        state = _mutate_and_apply(dev, mut, f"polling -> {args.hz} Hz")
+        raw = state[protocol.POLLING_OFFSET]
+        hz = protocol.polling_from_raw(raw)
+        ok = hz == args.hz
+        print(f"verified: byte33={raw:#04x} => {hz} Hz")
         return 0 if ok else 3
 
 
@@ -597,6 +612,7 @@ def main(argv=None):
             "  x17blake dpi 1600                          set ACTIVE stage dpi\n"
             "  x17blake stage 3 2000                      set stage 1-7 individually\n"
             "  x17blake lod 2                             lift-off distance 1-3\n"
+            "  x17blake polling 500                       set polling rate\n"
             "  x17blake led chroma --brightness 4         rainbow mode\n"
             "  x17blake led steady --color FF0000         solid red\n"
             "  x17blake led off                           lights out\n"
@@ -677,6 +693,11 @@ def main(argv=None):
     p = sub.add_parser("lod", help="lift-off distance")
     p.add_argument("level", type=int, choices=(1, 2, 3), metavar="1-3")
     p.set_defaults(func=cmd_lod)
+
+    p = sub.add_parser("polling", help="polling rate (Hz)",
+                        description="Sets the USB polling rate. Factory default is 1000 Hz.")
+    p.add_argument("hz", type=int, choices=(125, 250, 500, 1000), metavar="125|250|500|1000")
+    p.set_defaults(func=cmd_polling)
 
     p = sub.add_parser(
         "keys", formatter_class=_RAW,

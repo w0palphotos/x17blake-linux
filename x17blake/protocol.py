@@ -367,8 +367,10 @@ def parse_settings(frame):
         "dpi_enabled_mask": frame[8],
         "dpi_stages": stages,
         "unknown_31_33": frame[30:33].hex(),
-        "lift_off_distance_raw": frame[33],
-        "lift_off_distance_ui": frame[33] - 1 if frame[33] >= 2 else None,
+        "lift_off_distance_raw": frame[POLLING_OFFSET],
+        "lift_off_distance_ui": frame[POLLING_OFFSET] - 1 if frame[POLLING_OFFSET] >= 2 else None,
+        "polling_raw": frame[POLLING_OFFSET],
+        "polling_hz": polling_from_raw(frame[POLLING_OFFSET]),
         "magic_trailer": frame[34:37].hex(),
         "led_effect_raw": frame[37],
         "led_effect": LED_EFFECTS.get(frame[37], f"unknown_{frame[37]:#04x}"),
@@ -413,6 +415,13 @@ LED_MIN_EFFECT = 0
 LED_MAX_EFFECT = 6
 LED_MAX_BRIGHTNESS = 4
 LED_MAX_SPEED = 2
+
+# Polling rate: settings-frame byte 33.
+# Verified from OemDrv captures (param-polling.pcap): the driver writes
+# 0x00/0x01/0x02/0x03 to byte 33 when cycling 125/250/500/1000 Hz.
+POLLING_RATES = {125: 0x00, 250: 0x01, 500: 0x02, 1000: 0x03}
+_POLLING_BY_RAW = {v: k for k, v in POLLING_RATES.items()}
+POLLING_OFFSET = 33
 
 
 def resolve_effect(text):
@@ -538,7 +547,20 @@ def set_enabled_mask(frame, mask):
 def set_lift_off_distance(frame, ui_level):
     if ui_level not in (1, 2, 3):
         raise ValueError("lift-off distance must be 1..3")
-    frame[33] = ui_level + 1
+    frame[POLLING_OFFSET] = ui_level + 1
+
+
+def set_polling(frame, hz):
+    """Set polling rate in Hz.  Writes the raw byte directly."""
+    if hz not in POLLING_RATES:
+        valid = ", ".join(str(k) for k in sorted(POLLING_RATES))
+        raise ValueError(f"polling rate must be one of: {valid}")
+    frame[POLLING_OFFSET] = POLLING_RATES[hz]
+
+
+def polling_from_raw(raw):
+    """Resolve byte33 raw value to Hz, or None if unknown."""
+    return _POLLING_BY_RAW.get(raw)
 
 
 def set_led(frame, effect=None, brightness=None, speed=None, colors_enabled=None):

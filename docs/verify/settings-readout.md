@@ -29,7 +29,7 @@ $ x17blake show
 Fantech X17 Blake (/dev/hidraw2)
   profile   : 1
   dpi       : *1:500   2:1200   3:1600   4:2000   5:2400   6:3000   7:4000
-  lift-off  : 2
+  polling   : 1000 Hz
   led       : ripple  brightness=0 speed=0
   colors    : 1:FF0000  2:00FF00  ...
 ```

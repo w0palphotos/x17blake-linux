@@ -238,7 +238,7 @@ def interesting_delta(before, after):
     if before[7] != after[7]:
         fields["active_stage"] = f"{before[7]}->{after[7]}"
     if before[33] != after[33]:
-        fields["lod"] = f"{before[33]}->{after[33]}"
+        fields["polling"] = f"{before[33]}->{after[33]}"
     if before[40] != after[40]:
         fields["profile"] = f"{before[40]}->{after[40]}"
     return fields

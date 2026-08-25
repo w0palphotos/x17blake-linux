@@ -2,7 +2,7 @@
 
 x17blake is a Linux configuration tool for the Fantech X17 Blake gaming mouse
 (Wings Tech `2ea8:2203`). It talks to the vendor HID config interface directly
-over hidraw and handles DPI stages, lift-off distance, lighting, button
+over hidraw and handles DPI stages, polling rate, lighting, button
 remapping, presets and backups. The protocol was reverse engineered from the
 Windows driver package. Pure Python stdlib, no daemon, nothing to compile.
 
@@ -18,7 +18,8 @@ Windows driver package. Pure Python stdlib, no daemon, nothing to compile.
 
 x17blake supports:
 
-- reading and writing all seven DPI stages (200 to 10000) and lift-off distance
+- reading and writing all seven DPI stages (200 to 10000) and polling rate
+  (125, 250, 500, 1000 Hz)
 - every lighting mode the firmware has: chroma, neon, custom breathe, breathe,
   tail, steady color and off, plus brightness and the seven-slot palette
 - remapping buttons to keyboard keys, Ctrl combos or built-in functions
@@ -57,7 +58,7 @@ x17blake info                  # list hidraw nodes
 
 x17blake dpi 1600              # dpi of the ACTIVE stage (200-10000)
 x17blake stage 3 2000          # set stage 1-7 individually
-x17blake lod 2                 # lift-off distance 1-3
+x17blake polling 500           # set polling rate (125/250/500/1000)
 
 # lighting: chroma, neon, custom_breathe, breathe, tail, steady, off
 x17blake led steady --color FF0000 --brightness 4
@@ -100,7 +101,7 @@ sensor id `0x3325`):
 | ----------------- | -------------------------------------------- |
 | Sensor            | PixArt PMW3325 optical                       |
 | DPI               | 200-10,000, on-the-fly adjustable            |
-| Polling rate      | 1000 Hz                                      |
+| Polling rate      | 125 / 250 / 500 / 1000 Hz                   |
 | Tracking          | 100 IPS / 20 G acceleration                  |
 | Switches          | Huano, 20 million click lifetime             |
 | Buttons           | 7, independently programmable                |
@@ -132,12 +133,11 @@ Linux only today (the transport opens `/dev/hidraw*` directly), Python
 
 ## Roadmap
 
-- [ ] Polling rate control
 - [ ] Macro support (`AA`/`A7`/`A8` upload trio structurally known)
 - [ ] TUI frontend (on top of the CLI library layer)
 - [ ] RPM packaging, COPR
 
-Done already: lighting (all modes), DPI/lift-off, full button
+Done already: lighting (all modes), DPI/polling rate, full button
 remapping (keyboard keys, built-in functions and real mouse clicks,
 including the main clicks themselves), presets, backup/restore/reset.
 Evidence for each lives in the [verification log](docs/verify/README.md).

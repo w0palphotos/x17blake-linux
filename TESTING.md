@@ -88,7 +88,7 @@ Currently writable (verified safe):
 ```sh
 x17blake dpi <200..10000>      # active stage
 x17blake stage <1-7> <dpi>
-x17blake lod <1|2|3>
+x17blake polling <125|250|500|1000>
 x17blake led <mode> [--brightness 0-4] [--color RRGGBB]
 x17blake keys bind forward --key x             # keyboard remap
 x17blake keys bind back --special mute         # built-in functions
@@ -111,7 +111,7 @@ Every mutating command auto-saves a backup to
 `~/.config/x17blake/` before touching the device.
 
 Binding persistence: the commit frame defines the whole button table,
-so every feature write (`led`, `dpi`, `stage`, `lod`, `restore`,
+so every feature write (`led`, `dpi`, `stage`, `polling`, `restore`,
 preset apply) carries your tracked bindings automatically; switching
 features no longer reverts buttons. `reset --yes` stays the one
 deliberate exception (factory reset).

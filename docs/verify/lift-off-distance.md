@@ -1,25 +1,27 @@
 # Lift-off distance
 
-**Status:** conflicted (was: verified)
-**Original date:** 2026-08-23
+**Status:** not supported on this mouse
+**Date:** 2026-08-25
 
-## What we thought
+## Why it's not adjustable
 
-Byte 33 was treated as lift-off distance. Raw = UI level + 1, factory raw 3
-equals UI 2, matching `Cfg.ini DefLOD=2`. Live round-trip writes 2->3->4
-confirmed read-back, so it looked solid.
+The X17 Blake uses the PixArt PMW3325 sensor, which has a fixed LOD of
+approximately 1.1 mm. This is not a firmware setting the host can change.
 
-## Why it's wrong
+The Sharkoon Light2 200 (same VID:PID 2ea8:2203) uses the PMW3389 and
+does expose adjustable LOD (1-3 mm) via its driver software. The X17
+Blake's OemDrv does not have an LOD slider. The frame layout in
+PROTOCOL.md was originally copied from the Sharkoon reference and labeled
+byte 33 as LOD, but that byte is actually the polling rate.
 
-On 2026-08-25 the `param-polling.pcap` capture showed OemDrv writes
-**0x00/0x01/0x02/0x03** to byte 33 when cycling 125/250/500/1000 Hz in the
-Parameter page. Factory default 0x03 is 1000 Hz. The earlier LOD test was
-therefore setting polling rate, not LOD. The read-back matched because the
-device stores any value the host writes.
+## What happened on 2026-08-23
 
-A hardware review (frontum.co.uk) says LOD is fixed at ~3 mm on this
-model. The vendor protocol exposes no known LOD register on the wire.
+`x17blake lod 1-3` wrote values 0x02/0x03/0x04 to byte 33 and
+read-back confirmed the device stored them. This looked like successful
+LOD adjustment. In reality it was setting the polling rate to 500/1000 Hz.
+No physical lift test was performed at the time.
 
 ## Related code
 
-`protocol.set_lift_off_distance` (now aliases `set_polling`), `cli.cmd_lod`.
+`protocol.set_polling`, `cli.cmd_polling`. The `set_lift_off_distance`
+function and `lod` subcommand have been removed.

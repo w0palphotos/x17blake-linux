@@ -9,7 +9,7 @@ Fedora 44, kernel hidraw transport).
 |---|---|---|
 | [settings-readout.md](settings-readout.md) | Read settings / device info | ✅ |
 | [dpi.md](dpi.md) | DPI stages & active stage | ✅ end-to-end |
-| [lift-off-distance.md](lift-off-distance.md) | Lift-off distance | ✅ verified |
+| [lift-off-distance.md](lift-off-distance.md) | Lift-off distance (not supported) | fixed ~1.1 mm |
 | [backup-restore-reset.md](backup-restore-reset.md) | Backup / restore / factory reset | ✅ proven in recovery |
 | [lighting-core.md](lighting-core.md) | chroma / neon / breathe / steady / off, brightness, colors | ✅ end-to-end |
 | [lighting-custom-breathe-tail.md](lighting-custom-breathe-tail.md) | custom breathe / tail modes | ✅ end-to-end |

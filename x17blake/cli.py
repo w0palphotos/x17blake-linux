@@ -67,8 +67,6 @@ def _show_pretty(frame):
     print(f"Fantech X17 Blake ({node})")
     print(f"  profile   : {s['profile']}")
     print(f"  dpi       : {_stage_line(frame)}")
-    lod = s["lift_off_distance_ui"]
-    print(f"  lift-off  : {lod if lod else s['lift_off_distance_raw']}")
     print(f"  polling   : {s['polling_hz'] or '?'} Hz")
     led = s["led_effect"]
     print(f"  led       : {led}  brightness={s['led_brightness']} speed={s['led_speed']}")
@@ -224,19 +222,6 @@ def cmd_led(args):
     print(f"{what}: applied")
     _show_pretty(state)
     return 0
-
-
-def cmd_lod(args):
-    with Device() as dev:
-
-        def mut(f):
-            protocol.set_lift_off_distance(f, args.level)
-
-        state = _mutate_and_apply(dev, mut, f"lift-off distance -> {args.level}")
-        raw = state[protocol.POLLING_OFFSET]
-        ok = raw == args.level + 1
-        print(f"verified: lift-off = {raw - 1 if raw >= 2 else raw}")
-        return 0 if ok else 3
 
 
 def cmd_polling(args):
@@ -603,7 +588,7 @@ def main(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
             "Fantech X17 Blake (Wings Tech 2ea8:2203) Linux configurator\n\n"
-            "Buttons, DPI, lift-off distance, lighting and presets —\n"
+            "Buttons, DPI, polling rate, lighting and presets\n"
             "straight over hidraw, no vendor software needed."
         ),
         epilog=(
@@ -611,7 +596,6 @@ def main(argv=None):
             "  x17blake show                              current state (--json for scripts)\n"
             "  x17blake dpi 1600                          set ACTIVE stage dpi\n"
             "  x17blake stage 3 2000                      set stage 1-7 individually\n"
-            "  x17blake lod 2                             lift-off distance 1-3\n"
             "  x17blake polling 500                       set polling rate\n"
             "  x17blake led chroma --brightness 4         rainbow mode\n"
             "  x17blake led steady --color FF0000         solid red\n"
@@ -689,10 +673,6 @@ def main(argv=None):
                    help="animation speed (lower = faster)")
     p.add_argument("--color", metavar="RRGGBB", help="paint all 7 color slots")
     p.set_defaults(func=cmd_led)
-
-    p = sub.add_parser("lod", help="lift-off distance")
-    p.add_argument("level", type=int, choices=(1, 2, 3), metavar="1-3")
-    p.set_defaults(func=cmd_lod)
 
     p = sub.add_parser("polling", help="polling rate (Hz)",
                         description="Sets the USB polling rate. Factory default is 1000 Hz.")

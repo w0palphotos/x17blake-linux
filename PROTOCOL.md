@@ -36,7 +36,7 @@ Known Light2 200 settings frame (64 bytes, report id 0x04):
 | 8       | enabled-stage bitmask                     |
 | 9-29    | 7 x DPI stage (x/y), unit = 50            |
 | 30-32   | zero                                      |
-| 33      | lift-off distance (2-4; UI value - 1)     |
+| 33      | polling rate (0x00=125, 0x01=250, 0x02=500, 0x03=1000 Hz) |
 | 34-36   | 02 00 A5                                  |
 | 37      | LED effect (0-9)                          |
 | 38      | LED speed (0-2, lower = faster)           |
@@ -135,7 +135,7 @@ active stage 1, profile 1.
 * Identity SET round-trip leaves state unchanged (probe --roundtrip OK).
 * Mutating stage 1 (500->800) via SET applies immediately; restore verified.
 * `dpi --stage N --dpi V` setter verified with read-back.
-* `lod 1-3` writes to byte 33; see note below re: polling conflict.
+* Polling rate (byte 33): 1000->500->250->125 Hz verified via per-transition pcaps.
 * LED color slots DRIVE the RGB (all-7-green test seen by user).
   Earlier red test was invalid: slot 1 was already FF0000.
 * LED effect byte (37) changes animations (10-id sweep visibly cycled
@@ -368,10 +368,9 @@ README spec.  The short `0101`/`0103` frames from `capture-1.pcap` are
 NOT polling commands. The poll capture (`param-polling.pcap`) showed only
 full 64-byte SET+COMMIT pairs on byte 33.
 
-Previously this byte was labeled as lift-off distance (Sharkoon reference
-`PROTOCOL.md:39`).  The LOD writes from 2026-08-23 (`lod 1-3` writing
-raw 2/3/4) were therefore setting polling, not LOD.  A hardware review
-confirms LOD is fixed at ~3 mm on this model; no LOD register is known.
+The Sharkoon Light2 200 (same VID:PID, PMW3389 sensor) exposes LOD as a
+separate adjustable parameter. The X17 Blake uses the PMW3325, which has a
+fixed LOD of approximately 1.1 mm. OemDrv for the Blake has no LOD slider.
 
 ## Open questions
 
@@ -387,9 +386,6 @@ confirms LOD is fixed at ~3 mm on this model; no LOD register is known.
 6. Whether class 0x01's modifier is fixed Ctrl or selectable; full
    behavior map of hold-class `fc 0a`.
 7. Byte 41 purpose (not writable via settings frame).
-8. LOD true byte: byte 33 is now confirmed as polling; the real LOD
-   register (if any) is elsewhere. The LOD writes from 2026-08-23
-   were effectively setting polling to 500/1000 Hz.
 
 ## Methodology references
 

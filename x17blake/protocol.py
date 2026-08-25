@@ -367,8 +367,6 @@ def parse_settings(frame):
         "dpi_enabled_mask": frame[8],
         "dpi_stages": stages,
         "unknown_31_33": frame[30:33].hex(),
-        "lift_off_distance_raw": frame[POLLING_OFFSET],
-        "lift_off_distance_ui": frame[POLLING_OFFSET] - 1 if frame[POLLING_OFFSET] >= 2 else None,
         "polling_raw": frame[POLLING_OFFSET],
         "polling_hz": polling_from_raw(frame[POLLING_OFFSET]),
         "magic_trailer": frame[34:37].hex(),
@@ -542,12 +540,6 @@ def set_active_stage(frame, index):
 
 def set_enabled_mask(frame, mask):
     frame[8] = mask & 0xFF
-
-
-def set_lift_off_distance(frame, ui_level):
-    if ui_level not in (1, 2, 3):
-        raise ValueError("lift-off distance must be 1..3")
-    frame[POLLING_OFFSET] = ui_level + 1
 
 
 def set_polling(frame, hz):

@@ -8,20 +8,48 @@ candidate records from Linux and observing the effect.
 
 ## Protocol facts
 
-* The commit frame doubles as the button-binding carrier: offsets 22-63
-  are 5-byte slots at bases 22, 27, 32, 37, 42, 47, 52. Permanent
-  residents `b5@32 / b6@37 / c8@52` are factory wheel-up / wheel-down /
-  LED-cycle assignments, not protocol magic.
+* The commit frame doubles as the button-binding carrier: offsets 7-63
+  are 5-byte slots on a stride-5 grid at bases 7, 12, 17, 22, 27, 32,
+  37, 42, 47, 52 (and an unowned 57). Permanent residents
+  `b5@32 / b6@37 / c8@52` are factory wheel-up / wheel-down /
+  LED-cycle assignments.
 * Record formats:
-  * `fc 00 <HID>`, plain keyboard key (`fc 00 14` = Q)
+  * `fc 00 <HID>`: plain keyboard key (`fc 00 14` = Q)
   * `fc 01 <HID>`: Ctrl-modified key (`fc 01 13` = Ctrl+P)
-  * `<T> 00 00 00 00`, built-in function (see table)
-* Slot ownership: 27=forward, 22=back, 42=dpi-, 47=dpi+; slot 57
-  accepts records but its button is unidentified.
-* GET replies never contain bindings, host-side state is the only
+  * `fc 0a <HID>`: press-and-hold form (`fc 0a 13` dims the display
+    while held, restores on release)
+  * `<T> 00 00 00 00`: built-in function (see table)
+* Slot ownership (all verified live): 7=left, 12=right, 17=middle,
+  22=back, 27=forward, 42=dpi-, 47=dpi+; slot 57 accepts records but
+  its button is unidentified.
+* GET replies never contain bindings, so host-side state is the only
   source of truth; a commit write redefines the whole table.
 * Special-function records emit no button-press notify on EP2 IN;
   keyboard-class bindings echo as `[01][class][00][code]`.
+
+## Function table (relocate-and-press experiments)
+
+| Tag | Function | Evidence |
+|-----|----------|----------|
+| 0x90 | volume up | user-observed, two independent rounds |
+| 0x91 | volume down | ditto |
+| 0x92 | mute | ditto |
+| 0x93 | play/pause | ditto |
+| 0x94 | stop (inferred) | inert in test conditions |
+| 0x95 | previous track | ditto |
+| 0x96 | next track | ditto |
+| 0xB0 | left click | real clicks observed from relocated slots |
+| 0xB1 | right click | ditto (context menus) |
+| 0xB2 | middle click | ditto |
+| 0xB3 | navigate forward | browser history moved |
+| 0xB4 | navigate back | ditto |
+| 0xB5 | scroll up | forward-slot relocation |
+| 0xB6 | scroll down | ditto |
+| 0xC8 | lighting-mode cycle | forward-slot relocation |
+
+Tags `c0-c3` produced no visible effect under niri/Wayland. Tags
+0x97-0x9A emit keyboard-like output (`98`=Mod+R, `99`=Mod+F, `9A`='d'):
+a separate shortcut space, uncatalogued.
 
 ## Function table (relocate-and-press experiments)
 
@@ -56,6 +84,16 @@ cleared 2 binding(s); ...
 $ x17blake keys bind back --special mute
 # pressing Back toggled mute (OS volume OSD)            -> PASS
 
+$ x17blake keys bind dpi_plus --special volume_up
+$ x17blake keys bind dpi_minus --special volume_down
+# DPI+ / DPI- stepped the volume; Back/Forward stayed native -> PASS
+
+# relocate experiments (tools/explore_bindings.py):
+# b0/b1/b2 on forward/back/dpi- produced real left/right/middle clicks
+# b3/b4 navigated browser history forward/back              -> PASS
+# slots 7/12/17 planted with letters: LEFT typed 'u',
+# RIGHT 'i', MIDDLE 'o' (main buttons own their slots)      -> PASS
+
 $ x17blake preset apply initial-factory --yes
 restored 0 binding(s) from preset                       -> PASS
 ```
@@ -70,6 +108,6 @@ Safety behavior verified:
 
 ## Known limitations
 
-* Mouse-button targets (bind to right-click etc.) have no known wire
-  encoding yet, Cfg.ini codes are UI-namespace only.
 * Disable tag, macro step encoding, polling-rate opcode: open.
+* Tags `c0-c7` and the `0x97-0x9A` shortcut space are not catalogued.
+* Button owning slot 52 is unidentified.

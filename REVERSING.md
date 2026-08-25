@@ -91,7 +91,16 @@ captures needed. The technique, now automated in
 This decoded the full special-function table (volume/media/scroll/
 LED-cycle), the slot->button map for dpi-/dpi+, and falsified the
 Cfg.ini mouse-button-code assumption (`fc 01 13` is Ctrl+P, not
-right-click) in a single session.
+right-click) in a single session. A follow-up pass went further:
+
+* planting letters into never-seen offsets proved the stride-5 grid
+  starts at 7: slots 7/12/17 belong to the LEFT/RIGHT/MIDDLE buttons,
+  so every programmable button is remappable;
+* sweeping the bare-tag space found the input-action enum
+  `b0-b6` (left/right/middle click, navigate forward/back, scroll
+  up/down), which is how mouse-click targets are encoded on the wire;
+* class `fc 0a <code>` turned out to be a press-and-hold form
+  (`fc 0a 13` dims the display while held).
 
 If you ever need deeper static work, Ghidra (headless) gives function
 boundaries that raw objdump lacks; everything above was done with objdump

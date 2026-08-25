@@ -90,21 +90,22 @@ x17blake dpi <200..10000>      # active stage
 x17blake stage <1-7> <dpi>
 x17blake lod <1|2|3>
 x17blake led <mode> [--brightness 0-4] [--color RRGGBB]
-x17blake keys bind forward --key x     # keyboard remap, verified slots
+x17blake keys bind forward --key x             # keyboard remap
+x17blake keys bind back --special mute         # built-in functions
+x17blake keys bind left --special right_click  # real clicks, all buttons
 x17blake keys clear --all
 x17blake backup [label]
 x17blake restore <file> [--yes]
 x17blake reset --yes           # factory reset (recovery path)
 ```
 
-Gated behind `--experimental`: binding slots 42/47 (their physical
-buttons are not yet identified, run `tools/probe_slots.py` once to map
-them). Never writable implicitly: the b5/b6/c8 resident slots and any
-non-0xFC-tag record bytes.
+Never writable implicitly: the b5/b6/c8 resident slots and any
+non-`fc`/bare-tag record bytes. Slot 57 accepts records but its button
+is unidentified, hence `--experimental`.
 
-Mouse-button remap targets (bind a button to right/middle/...) are not
-offered yet: their wire encoding is still unknown (see PROTOCOL.md,
-key-bindings section).
+Caution: rebinding LEFT to a non-click function is safe only while you
+can still reach a terminal; `x17blake keys clear --all` restores the
+factory behavior (keyboard input is enough).
 
 Every mutating command auto-saves a backup to
 `~/.config/x17blake/` before touching the device.

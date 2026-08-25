@@ -68,8 +68,10 @@ x17blake led off
 x17blake keys                              # show current bindings
 x17blake keys bind forward --key b         # Forward types 'b'
 x17blake keys bind back --special mute     # volume_up/down, mute,
-x17blake keys bind dpi_plus --special next_track  # play_pause, prev/next,
-x17blake keys clear --all                  # scroll_up/down, led_cycle
+x17blake keys bind dpi_plus --special next_track   # play_pause, prev/next,
+x17blake keys bind dpi_minus --special scroll_down  # scroll_up/down, led_cycle
+x17blake keys bind left --special right_click      # real clicks work too,
+x17blake keys clear --all                  # even on the main buttons
 
 x17blake backup [label]        # snapshot state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
@@ -130,14 +132,14 @@ Linux only today (the transport opens `/dev/hidraw*` directly), Python
 
 ## Roadmap
 
-- [ ] Button remapping: mouse-button targets (wire encoding unknown)
 - [ ] Polling rate control
 - [ ] Macro support (`AA`/`A7`/`A8` upload trio structurally known)
 - [ ] TUI frontend (on top of the CLI library layer)
 - [ ] RPM packaging, COPR
 
-Done already: lighting (all modes), DPI/lift-off, keyboard-key and
-built-in-function button remapping, presets, backup/restore/reset.
+Done already: lighting (all modes), DPI/lift-off, full button
+remapping (keyboard keys, built-in functions and real mouse clicks,
+including the main clicks themselves), presets, backup/restore/reset.
 Evidence for each lives in the [verification log](docs/verify/README.md).
 
 For research work start at [REVERSING.md](REVERSING.md); the wire-level

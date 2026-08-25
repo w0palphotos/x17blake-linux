@@ -222,9 +222,8 @@ settings frames never carry bindings.
 * `fc 01 13` on slot 22 (back): fired **Ctrl+P** (browser print
   dialog), NOT right-click. This proves class 0x01 is a modified
   keyboard key and that Cfg.ini's `01 13 R` notation is the Windows UI
-  namespace only. The wire encoding for mouse-button targets (bind a
-  physical button to left/right/middle/scroll/fire) remains UNKNOWN;
-  one targeted OemDrv capture still needed for that.
+  namespace only. Real mouse-click targets later turned up as bare
+  tags `b0/b1/b2`; see the function table below.
 * Both bindings cleared via commit-with-empty-table; buttons returned
   to factory behavior instantly (no power cycle needed).
 
@@ -290,9 +289,9 @@ shortcut space, mapping uncatalogued.
 * `fc 00 1b` @27, Forward typed `x`.
 * `fc 01 13` @22, fired **Ctrl+P** (print dialog), NOT right-click:
   class 0x01 is a modified keyboard key; Cfg.ini's `01 13 R` notation
-  is the Windows UI namespace only. Mouse-button wire targets remain
-  UNKNOWN.
-* `90/91/92/93/95/96/B5/B6/C8`, all verified per table above.
+  is the Windows UI namespace only.
+* `90/91/92/93/95/96/B0-B6/C8`, all verified per table above, incl.
+  real clicks from bare tags.
 * Commit-with-empty-table restores factory behavior instantly; binding
   writes survive device re-enumeration.
 

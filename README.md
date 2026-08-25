@@ -16,6 +16,10 @@ Windows driver package. Pure Python stdlib, no daemon, nothing to compile.
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](#install)
 
+**Official resources:** [Driver (Windows)](https://cdn.shopify.com/s/files/1/0630/1689/4649/files/Blake_EB__X17_Software_V1.0_19082000.exe?v=1703645864) -
+[User Manual (PDF)](https://cdn.shopify.com/s/files/1/0630/1689/4649/files/Blake_X17_UM_23110600.pdf?v=1699339990) -
+[FAQ](https://fantechworld.com/pages/blake-x17-faq)
+
 x17blake supports:
 
 - reading and writing all seven DPI stages (200 to 10000) and polling rate

@@ -372,6 +372,26 @@ The Sharkoon Light2 200 (same VID:PID, PMW3389 sensor) exposes LOD as a
 separate adjustable parameter. The X17 Blake uses the PMW3325, which has a
 fixed LOD of approximately 1.1 mm. OemDrv for the Blake has no LOD slider.
 
+## Double-click speed / Scrolling speed / Sensitivity: NOT ON DEVICE (2026-08-25)
+
+OemDrv's Parameter page exposes sliders for double-click speed (200-830 ms),
+scrolling speed (1-10) and mouse sensitivity (1-20).  Eight per-transition
+captures (one SET per slider position, extremes + midpoints) proved that
+**all three controls produce zero differences in the settings frame**.  Every
+SET is byte-for-byte identical across slider positions; no `A4` param-bank
+frames or other new frame types appear.
+
+These sliders are Windows API calls only:
+- Double-click speed: `SPI_SETDOUBLECLICKTIME` (range 200-830 ms, default 550)
+- Scrolling speed: `SPI_SETWHEELSCROLLLINES` (range 1-10, default 3)
+- Mouse sensitivity: `SPI_SETMOUSESPEED` (range 1-20, default 10)
+
+None are stored in the mouse firmware.  Linux has native equivalents:
+libinput `AccelSpeed` for pointer sensitivity, `libinput set-scroll-method`
+or compositor settings for scroll acceleration, and
+`xdotool click --delay` or tool-level repeat delays for double-click timing.
+No firmware interaction is needed or possible for these controls.
+
 ## Open questions
 
 1. Meaning of byte 8 (enabled mask = 0x01 while 7 stages configured?).
@@ -379,7 +399,9 @@ fixed LOD of approximately 1.1 mm. OemDrv for the Blake has no LOD slider.
 3. ~~Polling-rate command layout~~ **SOLVED**: settings-frame byte 33 encodes
    polling rate (0x00=125 Hz, 0x01=250, 0x02=500, 0x03=1000). See
    `docs/verify/polling-rate.md`.
-4. Brightness/speed byte semantics on Blake firmware.
+4. ~~Double-click speed / Scrolling speed / Sensitivity~~ **NOT ON DEVICE**:
+   OemDrv sliders are Windows-only API calls; no firmware storage.
+   See `docs/verify/windows-only-settings.md`.
 5. Disable-function tag; remaining special tags (`c0-c7` zone inert
    under Wayland so far; 0x97-0x9A shortcut space); button owning
    slot 52.

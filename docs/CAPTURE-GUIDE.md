@@ -36,18 +36,22 @@ sudo tcpdump -i usbmon<N> -s0 -w captures/<segment>.pcap
 ## Segment checklist
 
 Confirmed against the actual OemDrv UI (Key assignment / DPI / LED /
-Parameter / Macros pages). **Update 2026-08-24:** segments 5-7 are
+Parameter / Macros pages). **Update 2026-08-25:** segments 2-4 are
+RESOLVED — double-click speed, scrolling speed and mouse sensitivity
+are Windows-only API calls (`SPI_SETDOUBLECLICKTIME`,
+`SPI_SETWHEELSCROLLLINES`, `SPI_SETMOUSESPEED`); no firmware storage.
+See `docs/verify/windows-only-settings.md`.  Segments 5-7 are
 OBSOLETE, button semantics were decoded entirely from Linux via the
 relocate-and-press technique (see REVERSING.md and
-`tools/explore_bindings.py`); no VM capture needed. Remaining valuable
-segments marked with ❗.
+`tools/explore_bindings.py`); no VM capture needed.  Remaining
+valuable segments marked with ❗.
 
 | # | Segment name | Action inside OemDrv | Unlocks | Status |
 |---|---|---|---|---|
-| 1 | `param-polling` ❗ | cycle each polling-rate option | polling-rate opcode | open (short `0101`/`0103` writes are candidates) |
-| 2 | `param-sensitivity` ❗ | sensitivity slider: 1 -> Apply, then 20 -> Apply | sensitivity byte (1-20) | open |
-| 3 | `param-scroll` ❗ | scroll-speed slider: 1 -> Apply, then 10 -> Apply | scroll-speed byte (1-10) | open |
-| 4 | `param-dblclick` ❗ | double-click slider: 830 -> Apply, then 200 -> Apply | debounce field (16-bit ms?) | open |
+| ~~1~~ | ~~`param-polling`~~ | ~~cycle each polling-rate option~~ | ~~polling-rate opcode~~ | **SOLVED**: byte 33 |
+| ~~2~~ | ~~`param-sensitivity`~~ | ~~sensitivity slider: 1 → Apply, then 20 → Apply~~ | ~~sensitivity byte (1-20)~~ | **NOT ON DEVICE** |
+| ~~3~~ | ~~`param-scroll`~~ | ~~scroll-speed slider: 1 → Apply, then 10 → Apply~~ | ~~scroll-speed byte (1-10)~~ | **NOT ON DEVICE** |
+| ~~4~~ | ~~`param-dblclick`~~ | ~~double-click slider: 830 → Apply, then 200 → Apply~~ | ~~debounce field (16-bit ms?)~~ | **NOT ON DEVICE** |
 | ~~5~~ | ~~key-fwd-keyb~~ |, |, | decoded from Linux |
 | ~~6~~ | ~~key-back-media~~ |, |, | decoded from Linux (function tags) |
 | ~~7~~ | ~~key-disable~~ | any button -> Disable | disable encoding | still unknown; a 30 s capture would settle it |
@@ -87,7 +91,6 @@ Known unknowns at time of writing:
 | Topic | Hint |
 |---|---|
 | Macro step data | `AA 00` -> `A7 01 00 3c` -> `A8 01` trio carries timed key events (see PROTOCOL.md key-bindings section) |
-| Polling rate | `Cfg.ini` hint `DR=0x500`; short `0101`/`0103` writes are candidates |
 | Class tags `90`/`92`/`f3` | lone-slot records seen once; likely disable/media/combo classes |
 | Commit payload `b5/b6/c8` | permanent binding-slot residents; owners unknown |
 

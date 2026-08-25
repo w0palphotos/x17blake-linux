@@ -5,4 +5,7 @@ __pycache__/
 dist/
 build/
 *.pcap.orig
+captures/dblclick-*.pcap
+captures/scroll-*.pcap
+captures/sensitivity-*.pcap
 x17blake-linux/

@@ -145,28 +145,6 @@ class Link:
             return None
 
 
-def load_tracked_entries():
-    try:
-        with open(BINDINGS_PATH) as fh:
-            return [e for e in json.load(fh) if isinstance(e, dict)]
-    except FileNotFoundError:
-        return []
-
-
-def entries_to_table(entries):
-    class_map = {
-        "keyboard": protocol.KEY_CLASS_KEYBOARD,
-        "keyboard_ctrl": protocol.KEY_CLASS_KEYBOARD_CTRL,
-    }
-    table = {}
-    for e in entries:
-        cls = class_map.get(e.get("class"))
-        if cls is None:
-            raise SystemExit(f"unknown stored binding class {e.get('class')!r}")
-        table[int(e["slot"])] = protocol.encode_binding(cls, int(e["code"]))
-    return table
-
-
 def apply_table(link, table):
     current = link.get_settings()
     if current is None:
@@ -364,9 +342,9 @@ def main():
             print("\nrestoring empty binding table ...", flush=True)
             try:
                 apply_table(link, {})
-                entries = load_tracked_entries()
+                entries = state.load_binding_entries()
                 if entries:
-                    apply_table(link, entries_to_table(entries))
+                    apply_table(link, state.binding_table(entries))
                 print("done.", flush=True)
             except SystemExit:
                 print("warning: could not restore — run "

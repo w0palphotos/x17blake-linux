@@ -13,7 +13,10 @@ from .state import (
     diff_bytes,
     latest_path,
     load_backup,
+    load_binding_entries,
     save_backup,
+    save_binding_entries,
+    binding_table,
     validate_mutations,
 )
 
@@ -214,7 +217,7 @@ def cmd_led(args):
         for param_frame in protocol.build_led_params(enable, brightness):
             dev._port.exchange(param_frame)
         dev._port.exchange(bytes(out))
-        dev._port.exchange(protocol.build_commit())
+        dev._port.exchange(dev.binding_commit())
         time.sleep(0.05)
         state = dev.read()
     print(f"{what}: applied")
@@ -237,43 +240,16 @@ def cmd_lod(args):
 
 # --- key bindings ------------------------------------------------------
 
-def _bindings_path():
-    return os.path.join(STATE_DIR, "bindings.json")
-
-
 def _load_bindings():
-    """Tracked binding entries: [{slot, class, code, name}, ...]."""
-    try:
-        with open(_bindings_path()) as fh:
-            entries = json.load(fh)
-    except FileNotFoundError:
-        return []
-    return [e for e in entries if isinstance(e, dict) and "slot" in e]
+    return load_binding_entries()
 
 
 def _save_bindings(entries):
-    os.makedirs(STATE_DIR, exist_ok=True)
-    with open(_bindings_path(), "w") as fh:
-        json.dump(entries, fh, indent=2)
-        fh.write("\n")
+    save_binding_entries(entries)
 
 
 def _entries_to_table(entries):
-    """Stored entries -> {offset: 5-byte record}."""
-    class_map = {
-        "keyboard": protocol.KEY_CLASS_KEYBOARD,
-        "keyboard_ctrl": protocol.KEY_CLASS_KEYBOARD_CTRL,
-    }
-    table = {}
-    for e in entries:
-        if e["class"] == "special":
-            table[int(e["slot"])] = protocol.encode_special(int(e["code"]))
-            continue
-        cls = class_map.get(e["class"])
-        if cls is None:
-            raise SafetyError(f"unknown stored binding class {e['class']!r}")
-        table[int(e["slot"])] = protocol.encode_binding(cls, int(e["code"]))
-    return table
+    return binding_table(entries)
 
 
 def _format_slot(offset):
@@ -426,11 +402,12 @@ def _write_bindings(dev, entries):
     save_backup(current, label="auto-prewrite")
     commit = protocol.build_commit(_entries_to_table(entries))
     dev.apply(bytes(current), validate=False, commit=commit)
+    dev.reload_bindings()
     time.sleep(0.05)
-    state = dev.read()
-    if diff_bytes(state, current):
+    state_frame = dev.read()
+    if diff_bytes(state_frame, current):
         raise SafetyError("settings frame changed during binding write")
-    return state
+    return state_frame
 
 
 
@@ -453,7 +430,7 @@ def _flash_frame(dev, frame):
     out = bytearray(frame)
     out[3] = protocol.CMD_SET_SETTINGS
     dev._port.exchange(bytes(out))
-    dev._port.exchange(protocol.build_commit())
+    dev._port.exchange(dev.binding_commit())
     time.sleep(0.05)
     return dev.read()
 

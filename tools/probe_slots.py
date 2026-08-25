@@ -59,28 +59,6 @@ PROBE_RESIDENTS = {
 }
 
 
-def load_tracked_entries():
-    try:
-        with open(BINDINGS_PATH) as fh:
-            return [e for e in json.load(fh) if isinstance(e, dict)]
-    except FileNotFoundError:
-        return []
-
-
-def entries_to_table(entries):
-    class_map = {
-        "keyboard": protocol.KEY_CLASS_KEYBOARD,
-        "keyboard_ctrl": protocol.KEY_CLASS_KEYBOARD_CTRL,
-    }
-    table = {}
-    for e in entries:
-        cls = class_map.get(e.get("class"))
-        if cls is None:
-            raise SystemExit(f"unknown stored binding class {e.get('class')!r}")
-        table[int(e["slot"])] = protocol.encode_binding(cls, int(e["code"]))
-    return table
-
-
 def write_probe_table(port, table):
     current = protocol.settings_from_packets(
         port.exchange(protocol.build_get_settings())
@@ -192,7 +170,7 @@ def main():
             print(f"(could not save slotmap: {err})")
     finally:
         print("\nrestoring previous bindings ...")
-        write_probe_table(port, entries_to_table(load_tracked_entries()))
+        write_probe_table(port, state.binding_table(state.load_binding_entries()))
         port.close()
         print("done.")
 

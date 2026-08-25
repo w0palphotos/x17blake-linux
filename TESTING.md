@@ -110,6 +110,12 @@ factory behavior (keyboard input is enough).
 Every mutating command auto-saves a backup to
 `~/.config/x17blake/` before touching the device.
 
+Binding persistence: the commit frame defines the whole button table,
+so every feature write (`led`, `dpi`, `stage`, `lod`, `restore`,
+preset apply) carries your tracked bindings automatically; switching
+features no longer reverts buttons. `reset --yes` stays the one
+deliberate exception (factory reset).
+
 ## 5. Quick smoke test checklist
 
 ```sh

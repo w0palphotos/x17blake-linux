@@ -1,7 +1,12 @@
 import time
 
 from . import hidraw, protocol
-from .state import SafetyError, validate_mutations
+from .state import (
+    SafetyError,
+    binding_table,
+    load_binding_entries,
+    validate_mutations,
+)
 
 
 class DeviceError(Exception):
@@ -11,6 +16,10 @@ class DeviceError(Exception):
 class Device:
     def __init__(self, interface=1):
         self._port = hidraw.open_config_interface(interface=interface)
+        # The commit frame defines the WHOLE binding table (absent slot
+        # = unbound), so feature writes must always carry the tracked
+        # bindings or they would silently wipe them.
+        self._tracked_bindings = load_binding_entries()
 
     def __enter__(self):
         self._port.open()
@@ -18,6 +27,14 @@ class Device:
 
     def __exit__(self, *exc):
         self._port.close()
+
+    def reload_bindings(self):
+        """Re-read the tracked table after keys bind/clear changed it."""
+        self._tracked_bindings = load_binding_entries()
+
+    def binding_commit(self):
+        """Commit frame that preserves all tracked button bindings."""
+        return protocol.build_commit(binding_table(self._tracked_bindings))
 
     def read(self):
         pkt = protocol.settings_from_packets(
@@ -34,7 +51,9 @@ class Device:
             current = self.read()
             validate_mutations(current, out)
         self._port.exchange(bytes(out))
-        self._port.exchange(commit if commit is not None else protocol.build_commit())
+        self._port.exchange(
+            commit if commit is not None else self.binding_commit()
+        )
         time.sleep(0.05)
         return self.read()
 

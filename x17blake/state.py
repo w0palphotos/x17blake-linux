@@ -7,10 +7,46 @@ from . import protocol
 
 STATE_DIR = os.path.expanduser("~/.config/x17blake")
 LATEST = os.path.join(STATE_DIR, "latest.json")
+BINDINGS_PATH = os.path.join(STATE_DIR, "bindings.json")
 
 
 class SafetyError(Exception):
     pass
+
+
+def load_binding_entries():
+    """Tracked button bindings: [{slot, class, code, name}, ...]."""
+    try:
+        with open(BINDINGS_PATH) as fh:
+            entries = json.load(fh)
+    except FileNotFoundError:
+        return []
+    return [e for e in entries if isinstance(e, dict) and "slot" in e]
+
+
+def save_binding_entries(entries):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(BINDINGS_PATH, "w") as fh:
+        json.dump(entries, fh, indent=2)
+        fh.write("\n")
+
+
+def binding_table(entries):
+    """Stored entries -> {slot_offset: 5-byte record} for build_commit."""
+    class_map = {
+        "keyboard": protocol.KEY_CLASS_KEYBOARD,
+        "keyboard_ctrl": protocol.KEY_CLASS_KEYBOARD_CTRL,
+    }
+    table = {}
+    for e in entries:
+        if e["class"] == "special":
+            table[int(e["slot"])] = protocol.encode_special(int(e["code"]))
+            continue
+        cls = class_map.get(e["class"])
+        if cls is None:
+            raise SafetyError(f"unknown stored binding class {e['class']!r}")
+        table[int(e["slot"])] = protocol.encode_binding(cls, int(e["code"]))
+    return table
 
 
 def _ensure_dir():

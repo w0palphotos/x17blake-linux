@@ -15,6 +15,7 @@ Fedora 44, kernel hidraw transport).
 | [lighting-custom-breathe-tail.md](lighting-custom-breathe-tail.md) | custom breathe / tail modes | ✅ end-to-end |
 | [color-depth.md](color-depth.md) | Effective color resolution | ✅ characterized |
 | [keys-remapping.md](keys-remapping.md) | Button remapping (keyboard + special functions) | ✅ end-to-end |
+| [polling-rate.md](polling-rate.md) | Polling rate (125/250/500/1000 Hz) | ✅ end-to-end |
 | [windows-only-settings.md](windows-only-settings.md) | Double-click / scroll speed / sensitivity | NOT ON DEVICE |
 
 Shared transport facts used everywhere (details in

@@ -140,3 +140,36 @@ Bindings live in commit-frame slots; the device never reports them
 back, so `keys show` prints locally tracked state only. One run of
 `tools/probe_slots.py` identifies which slot belongs to each remaining
 physical button (~1 minute, restores previous bindings afterwards).
+
+## 7. Macro verification
+
+```sh
+# record real keystrokes (combos like ctrl+c work; esc esc or ctrl+c ends)
+python3 -m x17blake macro record my-test
+
+# inspect what was captured and how it encodes
+python3 -m x17blake macro show my-test
+python3 -m x17blake macro compile my-test      # steps, wire bytes, A8 frames
+
+# import a Windows OemDrv export and check the round-trip
+python3 -m x17blake macro import DSADSA.mly
+
+# bind and play
+python3 -m x17blake keys bind dpi_minus --macro-file ~/.config/x17blake/macros/my-test.macro
+# press the button -> the macro types; watch it live with:
+python3 tools/macro_watch.py 30                # button press + keystroke monitor
+python3 -m x17blake keys clear dpi_minus       # restore
+```
+
+Verification notes:
+
+* uploads are validated by the device (`A7` ack checked; a rejected
+  header raises instead of silently doing nothing);
+* single-frame macros were verified byte-for-byte against
+  `captures/capture-1.pcap`; multi-frame chunking follows the reversed
+  OemDrv `SetMacro` sequence;
+* `macro record` is the newest path and still on testing — if a
+  recording misbehaves, compare with `macro show` before rebinding;
+* media keys (volume, play/pause) cannot be recorded INTO a macro — the
+  firmware has no opcode for them inside macros. Bind them directly
+  with `keys bind <button> --special <fn>` instead.

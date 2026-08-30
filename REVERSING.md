@@ -44,7 +44,14 @@ virtual addresses via section headers (`objdump -h`): for `.rdata`,
 | `0x43ce10–0x43d630`            | message builders cluster (opener/GET/SET/commit/A7)                |
 | `0x43d130`                     | GET settings; parses reply payload at offset +5 into caller struct |
 | `0x43cfe0`                     | SET settings (variant A `01 02 A5`, then commit B `02 02 a5`)      |
-| `0x43d240`                     | macro/key-list upload channel (`A7 ...`): step encoding still open; simple button remaps ride the COMMIT frame instead |
+| `0x43d240`                     | `MallocMacroID` — builds the `A7 [id] [size+5 BE16]` header, waits for the `... 01` ack |
+| `0x43d2f0`                     | `FreeMacroID(0)` — the `AA 00` opener that flushes stored macros |
+| `0x43d380`                     | `SetMacro` — chunks the macro payload into `A8` frames (57 B each, `[A8][id][0][seg][total][len][data]`, `Sleep(15)`) |
+| `0x409ba0`                     | the whole Apply flow: free IDs, per-macro upload (50 ms pacing), binding matrix, `SetMatrix` commit |
+| `0x4097c0`                     | `StMacro_To_HdMacro` — event list to device payload `[01][30 zeros][step stream]`; also reveals the opcode set (02/03 key, 01 delay, 04/05 click, 06 wheel, 08/09 repeat) |
+| `0x416750`                     | Import `.mly` dialog handler: fixed `0x526` (1318 B) read, magic check |
+| `0x59c700`                     | VK→HID table (104 pairs) — the exact key set the firmware supports in macros |
+| `0x594f40+`                    | UTF-16 debug strings (`Add_Macro: FAILED...`, `MallocMacroID: ...`, `SetMacro: ...`) — free navigation aids |
 | globals `0x5d9020`, `0x5d8fe0` | receive buffers                                                    |
 
 Frame grammar and byte layouts: see PROTOCOL.md.
@@ -109,3 +116,35 @@ boundaries that raw objdump lacks; everything above was done with objdump
 
 For the hands-on USB capture workflow (VM setup, segment checklist,
 decode loop), see [docs/CAPTURE-GUIDE.md](docs/CAPTURE-GUIDE.md).
+
+## Macro protocol + `.mly` format (2026-08-30, Ghidra MCP session)
+
+The macro upload trio (`AA`/`A7`/`A8`), the step encoding, and the
+Windows `.mly` macro file format were cracked in one session by
+combining three techniques — recorded here because the mix is the
+reusable part:
+
+1. **Known-plaintext on `.mly`**: two exports of the *same* recording
+   (`test-typing.mly`, `qwerty-test.mly`) differ only in timestamps, so
+   key bytes that matched across files had to be the encoded key IDs;
+   the recorded typing order (qwerty rows, not alphabetical!) plus
+   `DSADSA.mly` (events known from a UI screenshot) fixed the mapping.
+   The magic `28 22 cc be` vs the `Add_Macro` code checking
+   `0xFA3388A0` exposed the obfuscation: **every byte is ROR8(x, 2)**.
+   Decoded, the file is plain magic + ASCII name + `[vk:u16][flags:u16]
+   [delay:u32 ms]` events — full layout in PROTOCOL.md.
+2. **Ack probing on the wire**: sending `A8` variants and reading the
+   device's single-byte verdict (`byte 2 == 01` accepted) pinned which
+   preamble fields the firmware validates — no button presses needed.
+3. **Ghidra on `OemDrv.exe`** (via the ryuumonbuchi MCP): the ack probe
+   told us *what* to look for; the decompiler gave the exact chunking
+   (`ceil(n/57)`, seg/total/len fields), payload wrapper
+   (`[01][30 zeros][steps]`), apply sequence with vendor timing
+   (100/50/15/50 ms), and the VK→HID table. Search the UTF-16 debug
+   strings first (`MallocMacroID`, `SetMacro`, `StMacro_To_HdMacro`) —
+   each one sits next to its builder function.
+
+The resulting implementation lives in `x17blake/protocol.py`
+(`parse_mly`, `build_macro_frames`) and `x17blake/device.py`
+(`upload_macro`), verified byte-for-byte against
+`captures/capture-1.pcap`.

@@ -28,6 +28,11 @@ x17blake supports:
   tail, steady color and off, plus brightness and the seven-slot palette
 - remapping buttons to keyboard keys, Ctrl combos or built-in functions
   (volume, media transport, scroll, LED mode cycle)
+- **keyboard macros**: record real keystrokes (`macro record`), interactive
+  text builder (`macro create`), or import Windows `.mly` exports
+  (`macro import`); upload protocol fully reversed incl. multi-frame
+  chunking (step stream capped at 993 bytes per macro; media keys only
+  work as direct button bindings, not inside macros)
 - named presets that capture device state and bindings together
 - automatic backups before every write, and a factory reset recovery path
 
@@ -77,6 +82,19 @@ x17blake keys bind dpi_plus --special next_track   # play_pause, prev/next,
 x17blake keys bind dpi_minus --special scroll_down  # scroll_up/down, led_cycle
 x17blake keys bind left --special right_click      # real clicks work too,
 x17blake keys clear --all                  # even on the main buttons
+
+# macros: record, build or import, then bind to any button
+x17blake macro record ctrl-saver           # record real keystrokes
+                                           # (combos work; esc esc or
+                                           # ctrl+c finishes)
+x17blake macro create my-combo             # interactive text builder
+                                           # (also offers record mode)
+x17blake macro import x.mly                # import a Windows OemDrv
+                                           # macro export
+x17blake macro list                        # saved macros
+x17blake macro compile my-combo            # inspect the wire encoding
+x17blake keys bind dpi_minus --macro-file ~/.config/x17blake/macros/my-combo.macro
+x17blake keys bind forward --macro 1       # or a built-in macro ID
 
 x17blake backup [label]        # snapshot state to ~/.config/x17blake/
 x17blake restore latest.json   # dry-run diff; add --yes to apply
@@ -134,10 +152,14 @@ Linux only today (the transport opens `/dev/hidraw*` directly), Python
 | `x17blake/cli.py`      | argparse CLI                                     |
 | `tools/explore_bindings.py` | relocate-and-press protocol decoder         |
 | `tools/probe_slots.py` | one-shot slot to button mapper                   |
+| `tools/macro_monitor.py` | live view of macro keystroke output            |
+| `tools/macro_watch.py` | dual-interface watcher (button + macro output)   |
+| `tools/mly_dump.py`    | debug dump for Windows `.mly` macro files        |
 
 ## Roadmap
 
-- [ ] Macro support (`AA`/`A7`/`A8` upload trio structurally known)
+- [x] Macro support (record / text builder / `.mly` import, multi-frame
+      upload; `macro record` is the newest path and still on testing)
 - [ ] TUI frontend (on top of the CLI library layer)
 - [ ] RPM packaging, COPR
 

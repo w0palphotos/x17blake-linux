@@ -55,8 +55,8 @@ valuable segments marked with ❗.
 | ~~5~~ | ~~key-fwd-keyb~~ |, |, | decoded from Linux |
 | ~~6~~ | ~~key-back-media~~ |, |, | decoded from Linux (function tags) |
 | ~~7~~ | ~~key-disable~~ | any button -> Disable | disable encoding | still unknown; a 30 s capture would settle it |
-| 8 | `macro-record-shortcut` ❗ | record keyboard shortcut, save | macro blob format (`AA`->`A7`->`A8` trio) | structure known, steps open |
-| 9 | `macro-assign` ❗ | assign macro to thumb button | assignment linkage | open |
+| ~~8~~ | ~~`macro-record-shortcut`~~ | ~~record keyboard shortcut, save~~ | ~~macro blob format (`AA`->`A7`->`A8` trio)~~ | **SOLVED** — fully reversed from OemDrv (Ghidra): step encoding, payload wrapper, multi-frame chunking; see PROTOCOL.md |
+| ~~9~~ | ~~`macro-assign`~~ | ~~assign macro to thumb button~~ | ~~assignment linkage~~ | **SOLVED** — `F3 [id] [mode] [times] 00` slot record on the COMMIT frame; upload sequence in PROTOCOL.md |
 
 Settings that produce ZERO new frames during capture are Windows-side
 only, document and skip them (Linux has native pointer/scroll
@@ -90,8 +90,8 @@ Known unknowns at time of writing:
 
 | Topic | Hint |
 |---|---|
-| Macro step data | `AA 00` -> `A7 01 00 3c` -> `A8 01` trio carries timed key events (see PROTOCOL.md key-bindings section) |
-| Class tags `90`/`92`/`f3` | lone-slot records seen once; likely disable/media/combo classes |
+| ~~Macro step data~~ | **SOLVED** — full upload protocol + step encoding + `.mly` format reversed (see PROTOCOL.md macro sections) |
+| Class tags `90`/`92`/`f3` | `90`/`92` decoded (volume/mute); `f3` = macro binding record (`F3 [id] [mode] [times] 00`) |
 | Commit payload `b5/b6/c8` | permanent binding-slot residents; owners unknown |
 
 ## Pitfalls (all encountered live)

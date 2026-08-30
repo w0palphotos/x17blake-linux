@@ -306,12 +306,43 @@ Button-press notify (EP2 IN, unsolicited, 9 bytes):
 whichever button was pressed (class/code in wire namespace); carries
 NO button index.
 
-Macro upload trio (capture-1): `AA 00` opener -> `A7 01 00 3c` ->
-`A8 01 | 01 01 37 01 <zeros> | step data @38..` (timed key events).
-Structure known; step encoding not yet decoded.
+## Macro upload protocol (fully reversed 2026-08-30, OemDrv RE @0x43d240/0x43d380/0x4097c0)
+
+Apply sequence (per OemDrv `FUN_00409ba0`, timing preserved in
+`device.upload_macro`):
+
+1. `FreeMacroID(0)`: `04 AA 00 ...` — flushes all stored macros
+   (`Sleep(100)` after).
+2. Per macro, ID starting at 1 and incrementing:
+   * `MallocMacroID`: `04 A7 [id] [(size+5) u16 BE] 00...` where size =
+     payload length; wait for ack `04 A7 [id] 01 ...` (response byte 2
+     must be 1); `Sleep(50)`.
+   * `SetMacro`: payload split into 57-byte chunks, one `04 A8` frame
+     each: `[A8][id][00][seg 1-based][total][len<=57][chunk...]`,
+     `Sleep(15)` between chunks; `Sleep(50)` after.
+3. `SetMatrix`: the normal COMMIT frame carries the macro bindings as
+   5-byte `F3 [id] [mode] [times] 00` slot records.
+
+Macro payload (StMacro_To_HdMacro, `FUN_004097c0`): `[01][30 zeros][step
+stream]` — byte 0 is an image header, bytes 1-30 reserved. Step stream
+opcodes: `02 XX` key down, `03 XX` key up (XX = HID usage), `01 HH LL`
+delay ms big-endian, `04/05 B` mouse button down/up, `06 dxL dxH dyL dyH`
+wheel, `08/09 X` repeat left/right click X times. Payload for a macro
+fits 31 + 993 bytes; verified byte-for-byte against capture-1.pcap.
+
+## Windows .mly macro file format (fully reversed 2026-08-30)
+
+Fixed 1318-byte record; **every byte is ROR8(x, 2)** (decode = ROL2).
+Decoded layout: u32 magic `0xFA3388A0` @0, u32 timestamp/checksum @4,
+wchar_t macro name @0x14, u16 = 1 @0x68, then 101 event slots @0x6a of
+`[vk:u16][flags:u16][delay:u32 ms]` (flags bit0: 1 = down, 0 = up;
+delay = pause AFTER the event, big-endian inside the u32 after byte
+decode). VK codes are standard Windows VKs. Parser:
+`protocol.parse_mly`, CLI: `x17blake macro import FILE.mly`.
 
 Unexplained singleton: an `f3 01 00 01` record seen on the forward
-slot in capture-1 (likely a further class/combo form). Short 2-byte OUT
+slot in capture-1 (likely a further class/combo form) — now explained:
+it IS the macro binding record (F3 tag, macro id 1). Short 2-byte OUT
 writes `0101`/`0103` (same capture) remain unidentified, polling-rate
 candidates. The lone tags `90`/`92` are now decoded, see the function
 table above.
@@ -395,7 +426,9 @@ No firmware interaction is needed or possible for these controls.
 ## Open questions
 
 1. Meaning of byte 8 (enabled mask = 0x01 while 7 stages configured?).
-2. Macro step-data encoding inside the `AA`/`A7`/`A8` upload trio.
+2. ~~Macro step-data encoding inside the `AA`/`A7`/`A8` upload trio~~
+   **SOLVED**: full upload protocol + step encoding + .mly format
+   reversed from OemDrv (see "Macro upload protocol" above).
 3. ~~Polling-rate command layout~~ **SOLVED**: settings-frame byte 33 encodes
    polling rate (0x00=125 Hz, 0x01=250, 0x02=500, 0x03=1000). See
    `docs/verify/polling-rate.md`.

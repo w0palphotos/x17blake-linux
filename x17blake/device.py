@@ -57,6 +57,33 @@ class Device:
         time.sleep(0.05)
         return self.read()
 
+
+    def upload_macro(self, macro_id, steps):
+        """Upload a macro to the mouse (OemDrv apply sequence, RE'd 2026-08-30).
+
+        steps: list of ("down", hid) | ("up", hid) | ("delay", ms)
+        Sequence: FreeMacroID(0) `AA 00` -> A7 header (acked) -> A8 chunks.
+        Timing mirrors OemDrv: 100ms after opener, 50ms after A7, 15ms
+        between chunks, 50ms tail (before the binding commit).
+        """
+        frames = protocol.build_macro_frames(macro_id, steps)
+        a7, chunks = frames[0], frames[1:]
+        self._port.exchange(protocol.build_macro_opener())
+        time.sleep(0.1)
+        resp = self._port.exchange(a7)
+        acked = any(len(p) > 2 and p[0] == protocol.REPORT_ID
+                    and p[1] == 0xA7 and p[2] == 1 for p in resp)
+        if not acked:
+            raise DeviceError(
+                f"macro header (A7) not accepted by device: "
+                + "; ".join(p.hex() for p in resp[:3])
+            )
+        time.sleep(0.05)
+        for frame in chunks:
+            self._port.exchange(frame)
+            time.sleep(0.015)
+        time.sleep(0.05)
+
     def led_begin_session(self):
         for _ in range(2):
             for step in range(4):

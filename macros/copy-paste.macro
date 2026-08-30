@@ -1,0 +1,4 @@
+# Copy-Paste combo: Ctrl+C then Ctrl+V
+press ctrl+c 30
+delay 100
+press ctrl+v 30

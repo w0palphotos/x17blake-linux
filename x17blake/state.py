@@ -42,6 +42,9 @@ def binding_table(entries):
         if e["class"] == "special":
             table[int(e["slot"])] = protocol.encode_special(int(e["code"]))
             continue
+        if e["class"] == "macro":
+            table[int(e["slot"])] = protocol.encode_macro(int(e["code"]))
+            continue
         cls = class_map.get(e["class"])
         if cls is None:
             raise SafetyError(f"unknown stored binding class {e['class']!r}")

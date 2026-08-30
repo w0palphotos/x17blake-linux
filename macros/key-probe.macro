@@ -1,0 +1,36 @@
+# key-class probe: taps every firmware-table key type, suspects last
+tap f1 200
+delay 250
+tap f5 200
+delay 250
+tap f12 200
+delay 250
+tap enter 200
+delay 250
+tap esc 200
+delay 250
+tap space 200
+delay 250
+tap tab 200
+delay 250
+tap capslock 200
+delay 250
+tap capslock 200
+delay 250
+tap left 200
+delay 250
+tap right 200
+delay 250
+tap up 200
+delay 250
+tap down 200
+delay 250
+tap kp5 200
+delay 250
+tap scrolllock 200
+delay 250
+tap application 200
+delay 250
+tap pause 200
+delay 250
+tap printscreen 200

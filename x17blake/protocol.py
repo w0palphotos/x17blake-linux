@@ -5,6 +5,52 @@ MSG_TYPE_SETTINGS = 0xA001
 CMD_GET_SETTINGS = 0x01
 CMD_SET_SETTINGS = 0x02
 
+# Fantech Windows .mly macro export (cracked 2026-08-30 via OemDrv RE).
+# Every byte on disk is ROR8(x, 2); decode with ROL2.  Decoded layout:
+#   0x00  u32 magic 0xFA3388A0 (the value Add_Macro checks)
+#   0x04  u32 unknown (timestamp or checksum)
+#   0x14  wchar_t macro name, plain ASCII after decode
+#   0x68  u16 = 1 (both samples)
+#   0x6a  event array, 12 bytes each, 101 slots to EOF:
+#         [vk:u16][flags:u16][delay:u32 ms]
+#         flags bit0: 1 = key down, 0 = key up; delay = pause AFTER the event
+MLY_MAGIC = 0xFA3388A0
+MLY_EVENTS_OFF = 0x6A
+MLY_EVENT_COUNT = (1318 - MLY_EVENTS_OFF) // 12
+
+
+def _rol2(b):
+    return ((b << 2) | (b >> 6)) & 0xFF
+
+
+def _mly_decode(data):
+    return bytes(_rol2(b) for b in data)
+
+
+# VK code -> HID usage
+VK_HID = {
+    0x08: 0x2A, 0x09: 0x2B, 0x0D: 0x28, 0x10: 0xE1, 0x11: 0xE0, 0x12: 0xE2,
+    0x13: 0xE3, 0x14: 0x39, 0x1B: 0x29, 0x20: 0x2C, 0x21: 0x4B, 0x22: 0x4E,
+    0x23: 0x4D, 0x24: 0x4A, 0x25: 0x50, 0x26: 0x52, 0x27: 0x4F, 0x28: 0x51,
+    0x2C: 0x46, 0x2D: 0x49, 0x2E: 0x4C, 0x5B: 0xE3, 0x5C: 0xE7, 0x5D: 0x65,
+    0x60: 0x62, 0x6A: 0x55, 0xFD: 0x58,
+    0x6B: 0x57, 0x6D: 0x56, 0x6E: 0x63, 0x6F: 0x54, 0x90: 0x53, 0x91: 0x47,
+    0xA0: 0xE1, 0xA1: 0xE5, 0xA2: 0xE0, 0xA3: 0xE4, 0xA4: 0xE2, 0xA5: 0xE6,
+    0xBA: 0x33, 0xBB: 0x2E, 0xBC: 0x36, 0xBD: 0x2D, 0xBE: 0x37, 0xBF: 0x38,
+    0xC0: 0x35, 0xDB: 0x2F, 0xDC: 0x31, 0xDD: 0x30, 0xDE: 0x34,
+}
+for _i in range(26):
+    VK_HID[0x41 + _i] = 0x04 + _i          # A-Z
+for _i in range(1, 10):
+    VK_HID[0x30 + _i] = 0x1D + _i          # 1-9
+VK_HID[0x30] = 0x27                        # 0
+for _i in range(12):
+    VK_HID[0x70 + _i] = 0x3A + _i          # F1-F12
+for _i in range(1, 10):
+    VK_HID[0x60 + _i] = 0x58 + _i          # numpad 1-9
+VK_HID[0x60] = 0x62                        # numpad 0
+
+
 HEADER_MAGIC = bytes([0x01, 0x02, 0xA5])
 TRAILER_MAGIC = bytes([0x02, 0x00, 0xA5])
 
@@ -166,6 +212,7 @@ COLOR_SLOTS_ALL = 0x7F
 BINDING_TAG_KEYBOARD = 0xFC
 KEY_CLASS_KEYBOARD = 0x00
 KEY_CLASS_KEYBOARD_CTRL = 0x01
+BINDING_TAG_MACRO = 0xF3
 
 # Bare-tag records ([T][00][00][00][00]) assign built-in functions.
 # Decoded live 2026-08-24 by relocating candidates into verified slots
@@ -249,6 +296,31 @@ _HID_NAV_KEYS = {
     "left": 0x50,
     "down": 0x51,
     "up": 0x52,
+    "printscreen": 0x46,
+    "scrolllock": 0x47,
+    "pause": 0x48,
+    "application": 0x65,
+    "numlock": 0x53,
+    "kpdivide": 0x54,
+    "kpmultiply": 0x55,
+    "kpminus": 0x56,
+    "kpplus": 0x57,
+    "kpenter": 0x58,
+    "kp1": 0x59, "kp2": 0x5A, "kp3": 0x5B, "kp4": 0x5C, "kp5": 0x5D,
+    "kp6": 0x5E, "kp7": 0x5F, "kp8": 0x60, "kp9": 0x61, "kp0": 0x62,
+    "kpdot": 0x63,
+    # punctuation (US layout)
+    "minus": 0x2D,
+    "equal": 0x2E,
+    "lbracket": 0x2F,
+    "rbracket": 0x30,
+    "backslash": 0x31,
+    "semicolon": 0x33,
+    "quote": 0x34,
+    "grave": 0x35,
+    "comma": 0x36,
+    "dot": 0x37,
+    "slash": 0x38,
 }
 
 
@@ -262,6 +334,13 @@ def _build_keyboard_keys():
     for n in range(1, 13):
         keys[f"f{n}"] = 0x3A + (n - 1)
     keys.update(_HID_NAV_KEYS)
+    # Modifier keys
+    keys.update({
+        "lctrl": 0xE0, "ctrl": 0xE0, "rctrl": 0xE4,
+        "lshift": 0xE1, "shift": 0xE1, "rshift": 0xE5,
+        "lalt": 0xE2, "alt": 0xE2, "ralt": 0xE6,
+        "lgui": 0xE3, "gui": 0xE3, "win": 0xE3, "super": 0xE3, "rgui": 0xE7,
+    })
     return keys
 
 
@@ -298,6 +377,154 @@ def keyboard_code_name(code):
 
 def encode_binding(key_class, code):
     return bytes([BINDING_TAG_KEYBOARD, key_class & 0xFF, code & 0xFF, 0, 0])
+
+
+def encode_macro(macro_id, cycle_mode=0, cycle_times=1):
+    if not 1 <= macro_id <= 255:
+        raise ValueError("macro_id must be 1..255")
+    return bytes([BINDING_TAG_MACRO, macro_id & 0xFF, cycle_mode & 0xFF, cycle_times & 0xFF, 0])
+
+
+def encode_macro_steps(steps):
+    """Encode macro steps into the wire byte format.
+
+    steps: list of ("down", hid_code) | ("up", hid_code) | ("delay", ms)
+    Wire format (StMacro_To_HdMacro): 02 XX = key down, 03 XX = key up,
+    01 HH LL = delay ms (big-endian 16-bit).
+    """
+    buf = bytearray()
+    for action, value in steps:
+        if action == "down":
+            buf += bytes([0x02, value & 0xFF])
+        elif action == "up":
+            buf += bytes([0x03, value & 0xFF])
+        elif action == "delay":
+            buf += bytes([0x01, (value >> 8) & 0xFF, value & 0xFF])
+        else:
+            raise ValueError(f"unknown macro action '{action}'")
+    return bytes(buf)
+
+
+MACRO_PAYLOAD_HEADER = b"\x01" + b"\x00" * 30
+A8_CHUNK_DATA_MAX = 0x39  # 57 bytes per A8 chunk (OemDrv SetMacro @0x43d380)
+
+
+def build_macro_payload(steps):
+    """Device macro image (StMacro_To_HdMacro @0x4097c0): [0x01][30 zeros][steps]."""
+    return MACRO_PAYLOAD_HEADER + encode_macro_steps(steps)
+
+
+def build_macro_opener():
+    """AA 00 frame — FreeMacroID(0): flush stored macros, starts upload session."""
+    frame = bytearray(REPORT_SIZE)
+    frame[0] = REPORT_ID
+    frame[1] = 0xAA
+    return frame
+
+
+def build_macro_frames(macro_id, steps):
+    """Build A7 header + A8 chunk frames for a macro upload.
+
+    Reversed from OemDrv (MallocMacroID @0x43d240, SetMacro @0x43d380):
+      A7: [A7][macro_id][(payload_size+5) u16 big-endian]
+      A8 chunk (data <= 57 bytes): [A8][macro_id][0][seg 1-based][total][len][data]
+    Verified byte-for-byte against capture-1.pcap for the DSADSA macro.
+    """
+    payload = build_macro_payload(steps)
+    size_field = len(payload) + 5
+    if size_field > 0xFFFF:
+        raise ValueError("macro too large for device")
+    a7 = bytearray(REPORT_SIZE)
+    a7[0] = REPORT_ID
+    a7[1] = 0xA7
+    a7[2] = macro_id & 0xFF
+    a7[3] = (size_field >> 8) & 0xFF
+    a7[4] = size_field & 0xFF
+
+    chunks = [payload[i:i + A8_CHUNK_DATA_MAX]
+              for i in range(0, len(payload), A8_CHUNK_DATA_MAX)]
+    total = len(chunks)
+    frames = [bytes(a7)]
+    for seg, chunk in enumerate(chunks, 1):
+        a8 = bytearray(REPORT_SIZE)
+        a8[0] = REPORT_ID
+        a8[1] = 0xA8
+        a8[2] = macro_id & 0xFF
+        a8[3] = 0x00
+        a8[4] = seg
+        a8[5] = total
+        a8[6] = len(chunk)
+        a8[7:7 + len(chunk)] = chunk
+        frames.append(bytes(a8))
+    return frames
+
+
+def parse_mly(path):
+    """Parse a Fantech Windows .mly macro export into (action, value) steps."""
+    import struct
+    data = _mly_decode(open(path, "rb").read())
+    magic, = struct.unpack_from("<I", data, 0)
+    if magic != MLY_MAGIC:
+        raise ValueError(f"{path}: bad decoded magic {magic:#010x} "
+                         "(not a Fantech .mly macro?)")
+    steps = []
+    off = MLY_EVENTS_OFF
+    for _ in range(MLY_EVENT_COUNT):
+        vk, flags, delay = struct.unpack_from("<HHI", data, off)
+        if vk == 0 and flags == 0 and delay == 0:
+            break
+        hid = VK_HID.get(vk)
+        if hid is None:
+            raise ValueError(f"{path}: unmapped VK {vk:#06x} at {off:#x}")
+        steps.append(("down" if flags & 1 else "up", hid))
+        if delay:
+            steps.append(("delay", min(delay, 0xFFFF)))
+        off += 12
+    return steps
+
+
+def parse_macro_file(path):
+    """Parse a .macro text file into a list of (action, value) steps.
+
+    Format (one per line, # comments, blank lines ignored):
+        down <key>          key press (HID name or 0xNN)
+        up <key>            key release
+        delay <ms>          pause in milliseconds
+        tap <key> [delay]   shorthand: down + delay + up (default 30ms)
+        press <key1>+<key2>+... [delay]   combo: all down, delay, all up
+    """
+    steps = []
+    with open(path) as fh:
+        for lineno, raw in enumerate(fh, 1):
+            line = raw.split("#")[0].strip()
+            if not line:
+                continue
+            parts = line.split()
+            cmd = parts[0].lower()
+            if cmd == "down" and len(parts) == 2:
+                steps.append(("down", hid_keyboard_code(parts[1])))
+            elif cmd == "up" and len(parts) == 2:
+                steps.append(("up", hid_keyboard_code(parts[1])))
+            elif cmd == "delay" and len(parts) == 2:
+                steps.append(("delay", int(parts[1])))
+            elif cmd == "tap" and len(parts) >= 2:
+                code = hid_keyboard_code(parts[1])
+                ms = int(parts[2]) if len(parts) > 2 else 30
+                steps.append(("down", code))
+                steps.append(("delay", ms))
+                steps.append(("up", code))
+            elif cmd == "press" and len(parts) >= 2:
+                keys = parts[1].split("+")
+                ms = int(parts[2]) if len(parts) > 2 else 30
+                codes = [hid_keyboard_code(k) for k in keys]
+                for c in codes:
+                    steps.append(("down", c))
+                steps.append(("delay", ms))
+                for c in reversed(codes):
+                    steps.append(("up", c))
+            else:
+                raise ValueError(f"line {lineno}: bad macro command: {raw.rstrip()}")
+    return steps
 
 
 def encode_special(tag):

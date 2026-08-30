@@ -1,0 +1,54 @@
+# QWERTY full alphabet test macro
+# Types a-z with inter-key delays
+
+tap a 30
+delay 50
+tap b 30
+delay 50
+tap c 30
+delay 50
+tap d 30
+delay 50
+tap e 30
+delay 50
+tap f 30
+delay 50
+tap g 30
+delay 50
+tap h 30
+delay 50
+tap i 30
+delay 50
+tap j 30
+delay 50
+tap k 30
+delay 50
+tap l 30
+delay 50
+tap m 30
+delay 50
+tap n 30
+delay 50
+tap o 30
+delay 50
+tap p 30
+delay 50
+tap q 30
+delay 50
+tap r 30
+delay 50
+tap s 30
+delay 50
+tap t 30
+delay 50
+tap u 30
+delay 50
+tap v 30
+delay 50
+tap w 30
+delay 50
+tap x 30
+delay 50
+tap y 30
+delay 50
+tap z 30

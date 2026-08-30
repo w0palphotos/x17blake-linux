@@ -599,7 +599,7 @@ def parse_settings(frame):
         "magic_trailer": frame[34:37].hex(),
         "led_effect_raw": frame[37],
         "led_effect": LED_EFFECTS.get(frame[37], f"unknown_{frame[37]:#04x}"),
-        "led_speed": frame[38],
+        "led_speed": led_speed_from_wire(frame[38]),
         "led_brightness": frame[39],
         "profile": frame[40],
         "colors_enabled": frame[41],
@@ -725,10 +725,20 @@ def set_effect(frame, effect):
     frame[37] = effect
 
 
+def led_speed_from_wire(raw):
+    """Wire byte (0 = fastest on device) -> user scale (0 = slowest)."""
+    return LED_MAX_SPEED - raw
+
+
 def set_speed(frame, speed):
+    """Set animation speed on the USER scale: 0 = slowest, 2 = fastest.
+
+    The wire byte is inverted (0 = fastest on the device); see
+    led_speed_from_wire for the reverse mapping.
+    """
     if not 0 <= speed <= LED_MAX_SPEED:
         raise ValueError(f"speed must be 0..{LED_MAX_SPEED}")
-    frame[38] = speed
+    frame[38] = LED_MAX_SPEED - speed
 
 
 def set_brightness(frame, level):
@@ -787,8 +797,8 @@ def set_led(frame, effect=None, brightness=None, speed=None, colors_enabled=None
         frame[37] = effect & 0xFF
     if speed is not None:
         if not 0 <= speed <= 2:
-            raise ValueError("led speed must be 0..2 (lower = faster)")
-        frame[38] = speed
+            raise ValueError("led speed must be 0..2 (0 = slowest, 2 = fastest)")
+        frame[38] = LED_MAX_SPEED - speed
     if brightness is not None:
         if not 0 <= brightness <= 10:
             raise ValueError("led brightness must be 0..10")

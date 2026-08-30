@@ -39,7 +39,7 @@ Known Light2 200 settings frame (64 bytes, report id 0x04):
 | 33      | polling rate (0x00=125, 0x01=250, 0x02=500, 0x03=1000 Hz) |
 | 34-36   | 02 00 A5                                  |
 | 37      | LED effect (0-9)                          |
-| 38      | LED speed (0-2, lower = faster)           |
+| 38      | LED speed (wire: 0-2, lower = faster on device; `x17blake` exposes the inverted user scale, 0 = slowest) |
 | 39      | LED brightness (0-10)                     |
 | 40      | profile (1-5)                             |
 | 41      | colors enabled (?)                        |

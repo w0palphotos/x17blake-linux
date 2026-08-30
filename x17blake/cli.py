@@ -1223,7 +1223,7 @@ def main(argv=None):
                    help="chroma, neon, custom_breathe, breathe, tail, off, steady")
     p.add_argument("--brightness", type=int, choices=range(0, 5), metavar="0-4")
     p.add_argument("--speed", type=int, choices=range(0, 3), metavar="0-2",
-                   help="animation speed (lower = faster)")
+                   help="animation speed (0 = slowest, 2 = fastest)")
     p.add_argument("--color", metavar="RRGGBB", help="paint all 7 color slots")
     p.set_defaults(func=cmd_led)
 

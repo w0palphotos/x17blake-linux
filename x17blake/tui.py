@@ -7,7 +7,6 @@ validation behave exactly like the commands.
 """
 
 import curses
-import textwrap
 
 from . import protocol
 from .device import Device, DeviceError
@@ -30,6 +29,33 @@ BUTTONS = [
     (47, "DPI +"),
     (42, "DPI -"),
 ]
+
+# Top-view Blake art for the Keys tab; each digit 1-7 appears exactly
+# once and marks the matching BUTTONS[n-1] hotspot (1 left, 2 right,
+# 3 middle, 4 forward, 5 back, 6 dpi+, 7 dpi-).
+MOUSE_ART = [
+    "        .----------------------.",
+    "       /           3          \\",
+    "      /    1           2      \\",
+    "     |         ( 6 )           |",
+    "  4 >|           7             |",
+    "  5 >|                         |",
+    "     |                         |",
+    "     |            __           |",
+    "     |          /    \\         |",
+    "     |          \\____/         |",
+    "      \\        FANTECH        /",
+    "       \\______________________/",
+]
+
+ART_HOTSPOTS = {}
+for _n in range(1, 8):
+    for _r, _row in enumerate(MOUSE_ART):
+        _c = _row.find(str(_n))
+        if _c >= 0:
+            ART_HOTSPOTS[_n] = (_r, _c)
+            break
+assert len(ART_HOTSPOTS) == 7
 
 EFFECT_ORDER = ["chroma", "neon", "custom_breathe", "breathe", "tail", "steady", "off"]
 POLLING_ORDER = (125, 250, 500, 1000)
@@ -163,7 +189,14 @@ class App:
             x += len(label) + 2
 
     def _draw_keys_tab(self, win):
+        h, w = win.getmaxyx()
         entries = {int(e["slot"]): e for e in load_binding_entries()}
+
+        if w >= 70 and h - 5 >= 15:
+            self._draw_keys_threezone(win, entries, w, h)
+            return
+
+        # fallback for narrow/short terminals: single full-width list
         win.addstr(0, 2, "Button assignment", curses.A_BOLD)
         for i, (slot, label) in enumerate(BUTTONS):
             y = i + 2
@@ -176,6 +209,66 @@ class App:
                    curses.A_DIM)
         win.addstr(12, 2, "this list is locally tracked state (same as CLI)",
                    curses.A_DIM)
+
+    def _draw_keys_threezone(self, win, entries, w, h):
+        compact = w < 88
+        left_w = 22 if compact else 30
+        right_w = 20 if compact else 24
+
+        # left pane: main clicks + side buttons (1-5)
+        win.addstr(0, 1, "Buttons", curses.A_BOLD)
+        for i, (slot, label) in enumerate(BUTTONS[:5]):
+            y = i + 2
+            marker = ">" if i == self.sel else " "
+            line = f" {marker} {i + 1}  {label[:12] if compact else label}"
+            if not compact:
+                e = entries.get(slot)
+                line += f" -> {(e['name'] if e else None) or 'native'}"
+            attr = curses.A_REVERSE if i == self.sel else 0
+            win.addstr(y, 1, line[:left_w - 2], attr)
+
+        # right pane: DPI buttons (6-7) + details of the selected button
+        rx = w - right_w - 1
+        win.addstr(0, rx, "DPI", curses.A_BOLD)
+        for j, i in ((1, 5), (2, 6)):
+            slot, label = BUTTONS[i]
+            marker = ">" if i == self.sel else " "
+            line = f" {marker} {i + 1}  {label}"
+            attr = curses.A_REVERSE if i == self.sel else 0
+            win.addstr(j, rx, line[:right_w - 1], attr)
+
+        slot, label = BUTTONS[self.sel]
+        e = entries.get(slot)
+        binding = (e["name"] if e else None) or "native"
+        details = [
+            ("Details", curses.A_BOLD),
+            (f"{self.sel + 1} {label}", 0),
+            (f"slot {slot}", 0),
+            (f"binding: {binding}", 0),
+            ("", 0),
+            ("enter assign", curses.A_DIM),
+            ("d clear binding", curses.A_DIM),
+        ]
+        for j, (text, attr) in enumerate(details):
+            win.addstr(4 + j, rx, text[:right_w - 1], attr)
+        for j, note in enumerate(
+            ["wheel up/down are", "factory residents.", "Bindings are",
+             "locally tracked", "state only (the", "device never",
+             "reports them)."]
+        ):
+            win.addstr(h - 5 - 7 + j, rx, note[:right_w - 1], curses.A_DIM)
+
+        # middle: the mouse, with the selected hotspot highlighted
+        art_w = max(len(r) for r in MOUSE_ART)
+        zone = w - left_w - right_w - 2
+        ax = left_w + max(0, (zone - art_w) // 2)
+        for r, row in enumerate(MOUSE_ART):
+            win.addstr(2 + r, ax, row[:zone], curses.A_DIM)
+        for n, (r, c) in ART_HOTSPOTS.items():
+            attr = curses.color_pair(COLOR_TITLE) | curses.A_BOLD
+            if n - 1 == self.sel:
+                attr |= curses.A_REVERSE
+            win.addstr(2 + r, ax + c, str(n), attr)
 
     def _draw_dpi_tab(self, win):
         f = self.frame

@@ -32,6 +32,11 @@ BUNDLED_PRESET_DIR = os.path.join(
 EFFECT_NAMES = protocol.EFFECT_NAMES
 
 
+def cmd_tui(_args):
+    from . import tui
+    return tui.run()
+
+
 def _fail(msg, code=2):
     print(f"error: {msg}")
     raise SystemExit(code)
@@ -1178,6 +1183,13 @@ def main(argv=None):
         ),
     )
     sub = parser.add_subparsers(dest="command", metavar="command")
+
+    p = sub.add_parser(
+        "tui", help="experimental terminal UI",
+        description="Curses UI for key assignment, DPI stages and "
+                    "lighting. Testing build; every write uses the same "
+                    "guarded paths as the CLI (auto-backup included).")
+    p.set_defaults(func=cmd_tui)
 
     p = sub.add_parser("help", help="show help (optionally for a command)")
     p.add_argument("topic", nargs="?", metavar="COMMAND",

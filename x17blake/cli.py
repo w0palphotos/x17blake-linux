@@ -47,8 +47,20 @@ def cmd_info(_args):
     if not nodes:
         print("device not found (2ea8:2203)")
         return 1
+    where = hidraw.usb_location(nodes[0][1])
+    if where:
+        print(
+            f"Bus {where[0]:03d} Device {where[1]:03d}: "
+            f"ID {hidraw.VENDOR_ID:04x}:{hidraw.PRODUCT_ID:04x}"
+        )
+    denied = False
     for iface, node in nodes:
-        print(f"{node}  interface={iface}")
+        ok = os.access(node, os.R_OK | os.W_OK)
+        denied = denied or not ok
+        print(f"{node}  interface={iface}  {'ok' if ok else 'permission denied'}")
+    if denied:
+        print("hint: run `sudo ./install.sh` from the repo (or see README)")
+        return 1
     return 0
 
 
@@ -1360,7 +1372,11 @@ def main(argv=None):
         return 1
     except OSError as err:
         print(f"error: {err}")
-        print("hint: check udev rule and permissions (/etc/udev/rules.d/70-x17blake.rules)")
+        print(
+            "hint: run `sudo ./install.sh` from the repo, or copy "
+            "udev/70-x17blake.rules to /etc/udev/rules.d/ (see README; "
+            "immutable distros: /etc, never /usr/lib)"
+        )
         return 1
     except KeyboardInterrupt:
         print("\ninterrupted")

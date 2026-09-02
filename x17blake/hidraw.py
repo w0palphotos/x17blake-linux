@@ -43,6 +43,24 @@ def find_hidraw(interface=None):
     return matches
 
 
+def usb_location(devnode):
+    """Return (bus, dev) ints of the USB parent of a hidraw node, or None.
+
+    Walks /sys/class/hidraw/hidrawN/device/../.. which is the USB device
+    directory holding busnum/devnum (the same numbers lsusb prints).
+    """
+    sysdir = "/sys/class/hidraw/" + os.path.basename(devnode)
+    try:
+        base = os.path.realpath(os.path.join(sysdir, "device", "..", ".."))
+        with open(os.path.join(base, "busnum")) as fh:
+            bus = int(fh.read().strip())
+        with open(os.path.join(base, "devnum")) as fh:
+            dev = int(fh.read().strip())
+        return bus, dev
+    except (OSError, ValueError):
+        return None
+
+
 class ConfigPort:
     def __init__(self, path):
         self.path = path
@@ -98,9 +116,19 @@ class ConfigPort:
 def open_config_interface(interface=1):
     for iface, devnode in find_hidraw(interface=interface):
         port = ConfigPort(devnode)
+        try:
+            port.open()
+        except PermissionError as err:
+            raise PermissionError(
+                f"{devnode}: permission denied; install the udev rule "
+                f"(sudo ./install.sh, or copy udev/70-x17blake.rules to "
+                f"/etc/udev/rules.d/ and replug the mouse)"
+            ) from err
+        port.close()
         port.iface = iface
         return port
     raise FileNotFoundError(
         f"no hidraw node for {VENDOR_ID:04x}:{PRODUCT_ID:04x} "
-        f"(interface={interface}); check udev rules and permissions"
+        f"(interface={interface}); run `lsusb` and check the mouse is "
+        f"plugged in and enumerates as 2ea8:2203"
     )

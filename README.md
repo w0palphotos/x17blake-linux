@@ -41,17 +41,40 @@ work too. Reports from other hardware are welcome.
 
 ## Installation
 
-There are no packages yet, so run it from source:
+Run the installer from the source tree:
 
 ```sh
 git clone https://github.com/w0palphotos/x17blake-linux.git
 cd x17blake-linux
+./install.sh
+```
 
-# one time: allow your user to talk to the mouse
-sudo cp udev/70-x17blake.rules /usr/lib/udev/rules.d/
+Without root this installs the `x17blake` command for your user
+(package into `~/.local/lib/x17blake`, launcher into
+`~/.local/bin/x17blake`). With `sudo ./install.sh` it also installs the
+udev permission rule — do that once so your user can talk to the mouse.
+
+Uninstall with `./uninstall.sh` (backups under `~/.config/x17blake/`
+are user data and are kept).
+
+### Immutable distros (Silverblue, Aeon, SteamOS, ...)
+
+Never copy the rule into `/usr/lib/udev/rules.d/` — on image-based
+distros that path is read-only. Use `/etc/udev/rules.d/`, which stays
+writable, takes precedence, and survives OS updates (this is what
+`sudo ./install.sh` does):
+
+```sh
+sudo cp udev/70-x17blake.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
+```
 
-# run without installing anything
+On NixOS, add the rule line from `udev/70-x17blake.rules` to
+`services.udev.extraRules` instead.
+
+Run without installing anything:
+
+```sh
 python3 -m x17blake show
 ```
 

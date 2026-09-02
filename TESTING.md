@@ -25,9 +25,15 @@ HID raw devices are root-only by default. Install the shipped rule once
 so your user can talk to the mouse:
 
 ```sh
-sudo cp udev/70-x17blake.rules /usr/lib/udev/rules.d/
+sudo cp udev/70-x17blake.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
+
+`/etc/udev/rules.d/` is the local-admin location and stays writable on
+immutable distros (Silverblue/Bazzite/Aeon/SteamOS); do not use
+`/usr/lib/udev/rules.d/` there. NixOS: `services.udev.extraRules`.
+Alternatively `sudo ./install.sh` performs exactly the above plus a
+user install into `~/.local`.
 
 (Re-plug the mouse afterwards if permission is still denied.)
 

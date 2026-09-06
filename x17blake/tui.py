@@ -98,7 +98,7 @@ class Picker:
             self.top = self.sel - self._rows() + 1
 
     def _rows(self):
-        return max(4, curses.LINES - 8)
+        return max(4, curses.LINES - 10)
 
 
 class App:
@@ -153,89 +153,99 @@ class App:
         curses.init_pair(COLOR_DIM, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(COLOR_WARN, curses.COLOR_YELLOW, -1)
 
+    def _put(self, y, x, text, attr=0):
+        """Bounds-safe addstr on stdscr; never writes the last column."""
+        scr = self.stdscr
+        h, w = scr.getmaxyx()
+        if y < 0 or y >= h or x < 0 or x >= w - 1:
+            return
+        try:
+            scr.addstr(y, x, str(text)[:w - x - 1], attr)
+        except curses.error:
+            pass
+
     def draw(self):
         scr = self.stdscr
         scr.erase()
         h, w = scr.getmaxyx()
         self._draw_title(w)
         self._draw_tabs(w)
-        body = curses.newwin(h - 5, w, 3, 0)
+        top = 3
+        body_h = h - 5
         if self.tab == 0:
-            self._draw_keys_tab(body)
+            self._draw_keys_tab(scr, top, body_h, w)
         elif self.tab == 1:
-            self._draw_dpi_tab(body)
+            self._draw_dpi_tab(scr, top)
         else:
-            self._draw_led_tab(body)
-        body.noutrefresh()
+            self._draw_led_tab(scr, top)
         self._draw_status(w, h)
         if self.picker:
-            self._draw_picker()
-        curses.doupdate()
+            self._draw_picker(scr, h, w)
+        # single window, single refresh: getch()'s implicit stdscr
+        # refresh can no longer wipe anything
+        scr.refresh()
 
     def _draw_title(self, w):
         t = " x17blake TUI — Fantech X17 Blake (2ea8:2203) "
-        self.stdscr.addstr(0, max(0, (w - len(t)) // 2), t[:w],
-                           curses.A_BOLD | curses.color_pair(COLOR_TITLE))
-        self.stdscr.addstr(1, 2, "testing build — every write auto-backs up "
-                                 "to ~/.config/x17blake/",
-                           curses.A_DIM)
+        self._put(0, max(0, (w - len(t)) // 2), t,
+                  curses.A_BOLD | curses.color_pair(COLOR_TITLE))
+        self._put(1, 2, "testing build — every write auto-backs up "
+                        "to ~/.config/x17blake/", curses.A_DIM)
 
     def _draw_tabs(self, w):
         x = 2
         for i, name in enumerate(TAB_NAMES):
             label = f" {i + 1} {name} "
             attr = curses.A_REVERSE | curses.A_BOLD if i == self.tab else 0
-            self.stdscr.addstr(2, x, label, attr)
+            self._put(2, x, label, attr)
             x += len(label) + 2
 
-    def _draw_keys_tab(self, win):
-        h, w = win.getmaxyx()
+    def _draw_keys_tab(self, scr, top, body_h, w):
         entries = {int(e["slot"]): e for e in load_binding_entries()}
 
-        if w >= 70 and h - 5 >= 15:
-            self._draw_keys_threezone(win, entries, w, h)
+        if w >= 70 and body_h >= 15:
+            self._draw_keys_threezone(scr, top, body_h, entries, w)
             return
 
         # fallback for narrow/short terminals: single full-width list
-        win.addstr(0, 2, "Button assignment", curses.A_BOLD)
+        self._put(top, 2, "Button assignment", curses.A_BOLD)
         for i, (slot, label) in enumerate(BUTTONS):
-            y = i + 2
             e = entries.get(slot)
             target = (e["name"] if e else None) or "native"
             marker = ">" if i == self.sel else " "
             attr = curses.A_REVERSE if i == self.sel else 0
-            win.addstr(y, 2, f" {marker} {i + 1}  {label:<16} -> {target}", attr)
-        win.addstr(11, 2, "the device never reports bindings back;",
-                   curses.A_DIM)
-        win.addstr(12, 2, "this list is locally tracked state (same as CLI)",
-                   curses.A_DIM)
+            self._put(top + 2 + i, 2,
+                      f" {marker} {i + 1}  {label:<16} -> {target}", attr)
+        self._put(top + 11, 2, "the device never reports bindings back;",
+                  curses.A_DIM)
+        self._put(top + 12, 2,
+                  "this list is locally tracked state (same as CLI)",
+                  curses.A_DIM)
 
-    def _draw_keys_threezone(self, win, entries, w, h):
+    def _draw_keys_threezone(self, scr, top, body_h, entries, w):
         compact = w < 88
         left_w = 22 if compact else 30
         right_w = 20 if compact else 24
 
         # left pane: main clicks + side buttons (1-5)
-        win.addstr(0, 1, "Buttons", curses.A_BOLD)
+        self._put(top, 1, "Buttons", curses.A_BOLD)
         for i, (slot, label) in enumerate(BUTTONS[:5]):
-            y = i + 2
             marker = ">" if i == self.sel else " "
             line = f" {marker} {i + 1}  {label[:12] if compact else label}"
             if not compact:
                 e = entries.get(slot)
                 line += f" -> {(e['name'] if e else None) or 'native'}"
             attr = curses.A_REVERSE if i == self.sel else 0
-            win.addstr(y, 1, line[:left_w - 2], attr)
+            self._put(top + 2 + i, 1, line[:left_w - 2], attr)
 
         # right pane: DPI buttons (6-7) + details of the selected button
         rx = w - right_w - 1
-        win.addstr(0, rx, "DPI", curses.A_BOLD)
+        self._put(top, rx, "DPI", curses.A_BOLD)
         for j, i in ((1, 5), (2, 6)):
             slot, label = BUTTONS[i]
             marker = ">" if i == self.sel else " "
-            line = f" {marker} {i + 1}  {label}"
             attr = curses.A_REVERSE if i == self.sel else 0
-            win.addstr(j, rx, line[:right_w - 1], attr)
+            self._put(top + j, rx, f" {marker} {i + 1}  {label}", attr)
 
         slot, label = BUTTONS[self.sel]
         e = entries.get(slot)
@@ -250,31 +260,31 @@ class App:
             ("d clear binding", curses.A_DIM),
         ]
         for j, (text, attr) in enumerate(details):
-            win.addstr(4 + j, rx, text[:right_w - 1], attr)
+            self._put(top + 4 + j, rx, text, attr)
         for j, note in enumerate(
             ["wheel up/down are", "factory residents.", "Bindings are",
              "locally tracked", "state only (the", "device never",
              "reports them)."]
         ):
-            win.addstr(h - 5 - 7 + j, rx, note[:right_w - 1], curses.A_DIM)
+            self._put(top + body_h - 7 + j, rx, note, curses.A_DIM)
 
         # middle: the mouse, with the selected hotspot highlighted
         art_w = max(len(r) for r in MOUSE_ART)
         zone = w - left_w - right_w - 2
         ax = left_w + max(0, (zone - art_w) // 2)
         for r, row in enumerate(MOUSE_ART):
-            win.addstr(2 + r, ax, row[:zone], curses.A_DIM)
+            self._put(top + 2 + r, ax, row[:zone], curses.A_DIM)
         for n, (r, c) in ART_HOTSPOTS.items():
             attr = curses.color_pair(COLOR_TITLE) | curses.A_BOLD
             if n - 1 == self.sel:
                 attr |= curses.A_REVERSE
-            win.addstr(2 + r, ax + c, str(n), attr)
+            self._put(top + 2 + r, ax + c, str(n), attr)
 
-    def _draw_dpi_tab(self, win):
+    def _draw_dpi_tab(self, scr, top):
         f = self.frame
         active = f[7]
         mask = f[8]
-        win.addstr(0, 2, "DPI stages  (mask=%02X)" % mask, curses.A_BOLD)
+        self._put(top, 2, "DPI stages  (mask=%02X)" % mask, curses.A_BOLD)
         for i in range(7):
             x, y = protocol.dpi_stage_decode(f[protocol.stage_offset(i + 1):][:3])
             mark = "*" if i == active else " "
@@ -282,61 +292,61 @@ class App:
             val = f"{x}" if x == y else f"{x}/{y}"
             attr = curses.A_REVERSE if i == self.sel else 0
             star = curses.A_BOLD if i == active else 0
-            win.addstr(i + 2, 2, f" {cur} stage {i + 1}: {val:>9} dpi {mark}", attr | star)
+            self._put(top + 2 + i, 2,
+                      f" {cur} stage {i + 1}: {val:>9} dpi {mark}", attr | star)
         hz = protocol.polling_from_raw(f[33])
         cur = ">" if self.sel == 7 else " "
         attr = curses.A_REVERSE if self.sel == 7 else 0
-        win.addstr(9, 2, f" {cur} polling : {POLLING_LABEL.get(hz, '?'):>9}", attr)
-        win.addstr(11, 2, "* = active stage", curses.A_DIM)
+        self._put(top + 9, 2, f" {cur} polling : {POLLING_LABEL.get(hz, '?'):>9}", attr)
+        self._put(top + 11, 2, "* = active stage", curses.A_DIM)
 
-    def _draw_led_tab(self, win):
+    def _draw_led_tab(self, scr, top):
         f = self.frame
         eid = f[37]
         names = {protocol.EFFECT_NAMES[n]: n for n in EFFECT_ORDER}
         current = names.get(eid, f"id {eid}")
-        win.addstr(0, 2, "Lighting", curses.A_BOLD)
-        win.addstr(2, 2, f"  mode      : {current}")
-        win.addstr(3, 2, f"  brightness: {f[39]}  (0-4)")
+        self._put(top, 2, "Lighting", curses.A_BOLD)
+        self._put(top + 2, 2, f"  mode      : {current}")
+        self._put(top + 3, 2, f"  brightness: {f[39]}  (0-4)")
         speed = protocol.led_speed_from_wire(f[38])
-        win.addstr(4, 2, f"  speed     : {speed}  (0-2, user scale)")
+        self._put(top + 4, 2, f"  speed     : {speed}  (0-2, user scale)")
         palette = " ".join("%02X%02X%02X" % tuple(f[o:o + 3])
                            for o in (protocol.color_offset(i) for i in range(1, 8)))
-        win.addstr(6, 2, "  palette   : " + palette, curses.A_DIM)
-        win.addstr(9, 2, "enter cycles mode · +/- brightness · [/] speed",
-                   curses.A_DIM)
+        self._put(top + 6, 2, "  palette   : " + palette, curses.A_DIM)
+        self._put(top + 9, 2, "enter cycles mode · +/- brightness · [/] speed",
+                  curses.A_DIM)
 
     def _draw_status(self, w, h):
-        scr = self.stdscr
         hint = "1-3/tab tabs · j/k move · enter apply · q quit"
         if self.tab == 0:
             hint = "enter assign · d clear binding · " + hint.replace("enter apply · ", "")
         if self.tab == 1:
             hint = "+/- dpi · a set active · p polling · " + hint.replace("enter apply · ", "")
-        scr.addstr(h - 2, 0, self.status[:w - 1].ljust(w - 1), curses.A_DIM)
-        scr.addstr(h - 1, 0, (" " + hint)[:w - 1].ljust(w - 1),
-                   curses.color_pair(COLOR_DIM))
+        self._put(h - 2, 0, self.status.ljust(w - 1), curses.A_DIM)
+        self._put(h - 1, 0, (" " + hint).ljust(w - 1),
+                  curses.color_pair(COLOR_DIM))
 
-    def _draw_picker(self):
+    def _draw_picker(self, scr, h, w):
         p = self.picker
-        h, w = self.stdscr.getmaxyx()
-        rows = min(len(p.visible()) or 1, max(4, h - 8))
-        box_h = rows + 4
-        box_w = min(56, w - 4)
-        win = curses.newwin(box_h, box_w, (h - box_h) // 2, (w - box_w) // 2)
-        win.box()
-        win.addstr(0, 2, f" {p.title} ", curses.A_BOLD)
-        win.addstr(1, 2, f"filter: {p.filter_text}_")
         vis = p.visible()
+        rows = min(len(vis) or 1, max(4, h - 10))
+        box_h = rows + 4
+        box_w = min(56, w - 6)
+        y0 = max(0, (h - box_h) // 2)
+        x0 = max(0, (w - box_w) // 2)
+        self._put(y0, x0, "+" + "-" * (box_w - 2) + "+", curses.A_BOLD)
+        self._put(y0 + box_h - 1, x0, "+" + "-" * (box_w - 2) + "+")
+        self._put(y0, x0 + 2, f" {p.title} ", curses.A_BOLD)
+        self._put(y0 + 1, x0 + 1, f"filter: {p.filter_text}_")
         for i in range(rows):
             idx = p.top + i
             if idx >= len(vis):
                 break
             label = vis[idx][0]
             attr = curses.A_REVERSE if idx == p.sel else 0
-            win.addstr(i + 2, 2, (" " + label)[:box_w - 4], attr)
-        win.addstr(box_h - 1, 2, "type to filter · enter pick · esc cancel",
-                   curses.A_DIM)
-        win.noutrefresh()
+            self._put(y0 + 2 + i, x0 + 1, (" " + label)[:box_w - 3], attr)
+        self._put(y0 + box_h - 1, x0 + 2,
+                  " type to filter · enter pick · esc cancel ", curses.A_DIM)
 
     # ── input ───────────────────────────────────────────────────────
 
